@@ -58,6 +58,7 @@ body {
 }
 #header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
 #header .stats { font-size: 11px; color: var(--text-dim); margin-left: auto; white-space: nowrap; }
+#theme-btn { flex-shrink: 0; }
 
 /* Map */
 #map {
@@ -259,10 +260,11 @@ body {
 #theme-btn {
   background: none;
   border: none;
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 6px;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 /* Drop pin marker */
@@ -425,19 +427,56 @@ function makeMarker(spot) {
   const maxDailyStr = spot.max_daily_sek ? ` · Max ${spot.max_daily_sek} SEK/day` : '';
   const distStr = spot._dist != null ? `<br>${formatDist(spot._dist)} away` : '';
   const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}&travelmode=walking`;
+  const code = spot.area_code || '';
+  const codeHtml = code ? `<div class="popup-code" style="margin:4px 0;font-size:12px;color:var(--text-dim)">Area: <strong style="color:var(--text);font-size:14px;letter-spacing:1px">${escHtml(code)}</strong> <button onclick="copyCode('${escHtml(code)}')" style="background:var(--surface2);border:1px solid rgba(255,255,255,0.15);color:var(--text);padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;margin-left:4px">📋 Copy</button></div>` : '';
+  const appLinks = buildAppLinks(spot);
 
   marker.bindPopup(`
     <div class="popup-name">${escHtml(spot.name)}</div>
     <div class="popup-price">${priceStr}${maxDailyStr}</div>
+    ${codeHtml}
     <div class="popup-meta">
       ${escHtml(spot.price_text)}${limitStr}<br>
       ${spot.source} · ${spot.type}${distStr}<br>
       <a href="${navUrl}" target="_blank" rel="noopener">Navigate here →</a>
+      ${appLinks}
     </div>
-  `, { maxWidth: 260 });
+  `, { maxWidth: 280 });
 
   marker._spotId = spot.id;
   return marker;
+}
+
+function copyCode(code) {
+  navigator.clipboard.writeText(code).then(() => {
+    // Brief visual feedback
+    const btns = document.querySelectorAll('.popup-code button');
+    btns.forEach(b => { b.textContent = '✓ Copied'; setTimeout(() => b.textContent = '📋 Copy', 1500); });
+  }).catch(() => {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
+function buildAppLinks(spot) {
+  const code = spot.area_code || '';
+  if (!code) return '';
+  const links = [];
+  if (spot.source === 'easypark') {
+    // EasyPark deep link: easypark://area/{areaNo}
+    links.push(`<a href="easypark://area/${code}" style="color:var(--accent)">Open EasyPark →</a>`);
+  } else if (spot.source === 'parkster') {
+    // Parkster deep link: parkster://zone/{zoneCode}
+    links.push(`<a href="parkster://zone/${code}" style="color:var(--accent)">Open Parkster →</a>`);
+  } else {
+    // GBG spots - try both apps
+    links.push(`<a href="easypark://area/${code}" style="color:var(--accent)">EasyPark</a>`);
+    links.push(`<a href="parkster://zone/${code}" style="color:var(--accent)">Parkster</a>`);
+  }
+  return '<br>' + links.join(' · ');
 }
 
 function escHtml(s) {
@@ -512,11 +551,12 @@ function refreshMap() {
     const distStr = s._dist != null ? formatDist(s._dist) : '';
     const srcClass = `src-${s.source}`;
     const limitBadge = s.time_limit ? `<span style="color:var(--yellow);font-size:10px"> ⏱${s.time_limit}</span>` : '';
+    const codeBadge = s.area_code ? `<span style="color:var(--text-dim);font-size:10px;font-family:monospace"> #${escHtml(s.area_code)}</span>` : '';
     return `
       <div class="result-card" onclick="flyTo(${s.lat},${s.lon},'${s.id}')">
         <div class="price-badge ${priceClass(s.price_sek_hr)}">${priceStr}<br><span style="font-size:9px;font-weight:400">kr/h</span></div>
         <div class="info">
-          <div class="name">${escHtml(s.name)}${limitBadge}</div>
+          <div class="name">${escHtml(s.name)}${limitBadge}${codeBadge}</div>
           <div class="meta"><span class="source-dot ${srcClass}"></span>${s.source} · ${s.type}${s.price_text ? ' · '+escHtml(s.price_text) : ''}</div>
         </div>
         <div class="distance">${distStr}</div>

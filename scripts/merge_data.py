@@ -17,19 +17,19 @@ def parse_sek_per_hour(text: str) -> float | None:
     # Collect all price matches with their position in the text
     candidates = []
     # "X kr/15 min" → X*4 per hour
-    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*15\s*min", text):
+    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*(?:per\s+)?15\s*min", text):
         candidates.append((m.start(), float(m.group(1)) * 4))
     # "X kr/30 min" → X*2 per hour
-    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*30\s*min", text):
+    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*(?:per\s+)?30\s*min", text):
         candidates.append((m.start(), float(m.group(1)) * 2))
-    # "X kr/tim", "X kr/timme", "X kr tim"
-    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*tim", text):
+    # "X kr / per påbörjad timme" or "X kr/påbörjad tim"
+    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*(?:per\s+)?påbörjad\w*\s*tim", text):
+        candidates.append((m.start(), float(m.group(1))))
+    # "X kr/tim", "X kr/timme", "X kr tim", "X kr / per timme"
+    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*(?:per\s+)?tim", text):
         candidates.append((m.start(), float(m.group(1))))
     # "X kr/h" or "Xkr/h" (compact format)
     for m in re.finditer(r"(\d+)\s*kr\s*/\s*h\b", text):
-        candidates.append((m.start(), float(m.group(1))))
-    # "X kr/påbörjad timme" (per started hour)
-    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*påbörjad\s*tim", text):
         candidates.append((m.start(), float(m.group(1))))
     if candidates:
         # Return the first occurrence (primary/daytime rate)
@@ -109,6 +109,11 @@ def load_easypark() -> list[dict]:
         area_type = detail.get("areaType", "")
         custom_type = record.get("tileData", {}).get("customAreaType", "")
 
+        # Area code: extract the 3-digit zone prefix from the name (e.g. "801" from "801 Värmlandsgatan")
+        area_name = detail.get("areaName", "")
+        area_code_match = re.match(r"^(\d{3,4})\b", area_name)
+        area_code = area_code_match.group(1) if area_code_match else str(detail.get("areaNo", ""))
+
         results.append({
             "id": f"ep_{ano}",
             "name": detail.get("areaName", f"EasyPark {ano}"),
@@ -118,6 +123,7 @@ def load_easypark() -> list[dict]:
             "price_text": popup.split("\n")[0] if popup else "",
             "time_limit": time_limit,
             "max_daily_sek": max_daily,
+            "area_code": area_code,
             "type": classify_type(custom_type or area_type),
             "source": "easypark",
             "operator": detail.get("parkingOperatorName", ""),
@@ -191,6 +197,7 @@ def load_parkster() -> list[dict]:
             "price_text": price_text,
             "time_limit": None,
             "max_daily_sek": None,
+            "area_code": str(z.get("zoneCode", "")),
             "type": "street",  # Parkster is primarily street parking
             "source": "parkster",
             "operator": owner.get("name", ""),
@@ -252,6 +259,7 @@ def load_parkering_gbg() -> list[dict]:
             "price_text": raw_text.split(",")[0] if raw_text else "",
             "time_limit": time_limit,
             "max_daily_sek": None,
+            "area_code": str(a.get("parking_code", "") or ""),
             "type": classify_type(ptype),
             "source": "parkering_gbg",
             "operator": "Göteborgs Stad",
