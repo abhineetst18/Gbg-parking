@@ -25,6 +25,16 @@
   --text-dim: #a0a0b0;
   --radius: 12px;
 }
+[data-theme="light"] {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface2: #e4e6eb;
+  --text: #1c1e21;
+  --text-dim: #65676b;
+}
+[data-theme="light"] .leaflet-popup-content-wrapper { background: #fff !important; color: #1c1e21 !important; }
+[data-theme="light"] .leaflet-popup-tip { background: #fff !important; }
+[data-theme="light"] .marker-dot { border-color: #333; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   background: var(--bg);
@@ -227,6 +237,48 @@ body {
   font-weight: 600;
 }
 
+/* Radius slider row */
+#radius-row {
+  padding: 0 12px 6px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+#radius-row.visible { display: flex; }
+#radius-slider {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+}
+#radius-label { min-width: 44px; text-align: right; font-weight: 600; color: var(--text); }
+
+/* Theme toggle */
+#theme-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+/* Drop pin marker */
+.pin-marker {
+  font-size: 28px;
+  line-height: 1;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  cursor: grab;
+}
+
+/* Radius circle */
+.radius-circle {
+  stroke: var(--accent);
+  fill: var(--accent);
+}
+
 @media (min-width: 768px) {
   #panel { max-height: 35dvh; }
   #location-input { max-width: 300px; }
@@ -243,6 +295,7 @@ body {
 <div id="header">
   <h1>🅿️ Parking GBG</h1>
   <span id="stats" class="stats"></span>
+  <button id="theme-btn" title="Toggle theme">🌙</button>
 </div>
 
 <div id="map"></div>
@@ -256,6 +309,7 @@ body {
       <option value="distance">Nearest</option>
       <option value="price">Cheapest</option>
     </select>
+    <button class="btn" onclick="enableDropPin()" title="Drop a pin on the map">📌 Drop Pin</button>
     <button class="btn filter-btn" data-source="all" onclick="toggleSource(this)">All</button>
     <button class="btn filter-btn active" data-source="easypark" onclick="toggleSource(this)">EP</button>
     <button class="btn filter-btn active" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
@@ -265,6 +319,11 @@ body {
     <button class="btn filter-btn active" data-type="lot" onclick="toggleType(this)">Lot</button>
     <button class="btn filter-btn active" data-type="ev" onclick="toggleType(this)">EV</button>
     <button class="btn filter-btn active" data-type="other" onclick="toggleType(this)">Other</button>
+  </div>
+  <div id="radius-row">
+    <span>Radius:</span>
+    <input id="radius-slider" type="range" min="500" max="10000" step="500" value="3000">
+    <span id="radius-label">3 km</span>
   </div>
   <div id="results"></div>
 </div>
@@ -281,6 +340,11 @@ let map, userMarker, clusterGroup;
 let activeSources = new Set(['easypark', 'parkster', 'parkering_gbg']);
 let activeTypes = new Set(['street', 'garage', 'lot', 'ev', 'other']);
 let sortMode = 'distance';
+let searchRadius = 3000; // metres, adjustable
+let radiusCircle = null;
+let pinMarker = null;
+let dropPinMode = false;
+let currentTheme = 'dark'; // 'dark', 'light', 'satellite'
 
 // ── Map init ──
 map = L.map('map', {
@@ -294,11 +358,20 @@ L.control.attribution({ position: 'bottomright', prefix: false })
   .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OSM</a>')
   .addTo(map);
 
-// Dark tile layer
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+// Tile layers
+const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 19,
   subdomains: 'abcd',
-}).addTo(map);
+});
+const lightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19,
+  subdomains: 'abcd',
+});
+const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 19,
+});
+let activeLayer = darkLayer;
+darkLayer.addTo(map);
 
 clusterGroup = L.markerClusterGroup({
   maxClusterRadius: 40,
@@ -347,15 +420,17 @@ function makeMarker(spot) {
   });
   const marker = L.marker([spot.lat, spot.lon], { icon });
 
-  const priceStr = spot.price_sek_hr != null ? `${spot.price_sek_hr} SEK/hr` : 'Price unknown';
+  const priceStr = spot.price_sek_hr != null ? `${spot.price_sek_hr} SEK/hr` : (spot.price_text?.includes('Gratis') ? 'Free' : 'Price unknown');
+  const limitStr = spot.time_limit ? `<br>⏱ Max ${spot.time_limit}` : '';
+  const maxDailyStr = spot.max_daily_sek ? ` · Max ${spot.max_daily_sek} SEK/day` : '';
   const distStr = spot._dist != null ? `<br>${formatDist(spot._dist)} away` : '';
   const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}&travelmode=walking`;
 
   marker.bindPopup(`
     <div class="popup-name">${escHtml(spot.name)}</div>
-    <div class="popup-price">${priceStr}</div>
+    <div class="popup-price">${priceStr}${maxDailyStr}</div>
     <div class="popup-meta">
-      ${escHtml(spot.price_text)}<br>
+      ${escHtml(spot.price_text)}${limitStr}<br>
       ${spot.source} · ${spot.type}${distStr}<br>
       <a href="${navUrl}" target="_blank" rel="noopener">Navigate here →</a>
     </div>
@@ -403,12 +478,11 @@ function refreshMap() {
   }
 
   // Sort — when sorting by price, limit to spots within radius if user location is set
-  const MAX_PRICE_RADIUS = 3000; // 3 km radius for cheapest sort
   let sorted;
   if (sortMode === 'price') {
     let pool = filtered;
     if (userLat != null) {
-      pool = filtered.filter(s => s._dist != null && s._dist <= MAX_PRICE_RADIUS);
+      pool = filtered.filter(s => s._dist != null && s._dist <= searchRadius);
       if (pool.length === 0) pool = filtered; // fallback if nothing nearby
     }
     sorted = [...pool].sort((a, b) => {
@@ -434,14 +508,15 @@ function refreshMap() {
   const resultsEl = document.getElementById('results');
   const top = sorted.slice(0, 100);
   resultsEl.innerHTML = top.map(s => {
-    const priceStr = s.price_sek_hr != null ? `${s.price_sek_hr}` : '?';
+    const priceStr = s.price_sek_hr != null ? `${s.price_sek_hr}` : (s.price_text?.includes('Gratis') ? 'Free' : '?');
     const distStr = s._dist != null ? formatDist(s._dist) : '';
     const srcClass = `src-${s.source}`;
+    const limitBadge = s.time_limit ? `<span style="color:var(--yellow);font-size:10px"> ⏱${s.time_limit}</span>` : '';
     return `
       <div class="result-card" onclick="flyTo(${s.lat},${s.lon},'${s.id}')">
         <div class="price-badge ${priceClass(s.price_sek_hr)}">${priceStr}<br><span style="font-size:9px;font-weight:400">kr/h</span></div>
         <div class="info">
-          <div class="name">${escHtml(s.name)}</div>
+          <div class="name">${escHtml(s.name)}${limitBadge}</div>
           <div class="meta"><span class="source-dot ${srcClass}"></span>${s.source} · ${s.type}${s.price_text ? ' · '+escHtml(s.price_text) : ''}</div>
         </div>
         <div class="distance">${distStr}</div>
@@ -480,6 +555,7 @@ function setUserLocation(lat, lon) {
   }).addTo(map);
   userMarker.bindPopup('You are here').openPopup();
   map.flyTo([lat, lon], 16, { duration: 0.8 });
+  updateRadiusCircle();
   refreshMap();
 }
 
@@ -598,7 +674,89 @@ function toggleType(btn) {
 
 document.getElementById('sort-select').addEventListener('change', e => {
   sortMode = e.target.value;
+  const row = document.getElementById('radius-row');
+  if (sortMode === 'price') row.classList.add('visible');
+  else row.classList.remove('visible');
+  updateRadiusCircle();
   refreshMap();
+});
+
+// ── Radius slider ──
+document.getElementById('radius-slider').addEventListener('input', e => {
+  searchRadius = parseInt(e.target.value);
+  const label = searchRadius >= 1000 ? `${(searchRadius/1000).toFixed(1)} km` : `${searchRadius} m`;
+  document.getElementById('radius-label').textContent = label;
+  updateRadiusCircle();
+  refreshMap();
+});
+
+function updateRadiusCircle() {
+  if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
+  if (userLat != null && sortMode === 'price') {
+    radiusCircle = L.circle([userLat, userLon], {
+      radius: searchRadius,
+      color: '#e94560',
+      fillColor: '#e94560',
+      fillOpacity: 0.06,
+      weight: 1,
+      dashArray: '6,4',
+    }).addTo(map);
+  }
+}
+
+// ── Theme toggle (dark → light → satellite → dark) ──
+const themeBtn = document.getElementById('theme-btn');
+themeBtn.addEventListener('click', () => {
+  map.removeLayer(activeLayer);
+  if (currentTheme === 'dark') {
+    currentTheme = 'light';
+    activeLayer = lightLayer;
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.querySelector('meta[name="theme-color"]').content = '#ffffff';
+    themeBtn.textContent = '☀️';
+  } else if (currentTheme === 'light') {
+    currentTheme = 'satellite';
+    activeLayer = satelliteLayer;
+    document.documentElement.removeAttribute('data-theme');
+    document.querySelector('meta[name="theme-color"]').content = '#1a1a2e';
+    themeBtn.textContent = '🛰️';
+  } else {
+    currentTheme = 'dark';
+    activeLayer = darkLayer;
+    document.documentElement.removeAttribute('data-theme');
+    document.querySelector('meta[name="theme-color"]').content = '#1a1a2e';
+    themeBtn.textContent = '🌙';
+  }
+  activeLayer.addTo(map);
+});
+
+// ── Drop pin ──
+function enableDropPin() {
+  dropPinMode = true;
+  map.getContainer().style.cursor = 'crosshair';
+}
+
+map.on('click', e => {
+  if (!dropPinMode) return;
+  dropPinMode = false;
+  map.getContainer().style.cursor = '';
+  const { lat, lng } = e.latlng;
+
+  if (pinMarker) map.removeLayer(pinMarker);
+  const pinIcon = L.divIcon({
+    className: 'pin-marker',
+    html: '📍',
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+  });
+  pinMarker = L.marker([lat, lng], { icon: pinIcon, draggable: true }).addTo(map);
+  pinMarker.bindPopup('Dropped pin — drag to move').openPopup();
+  pinMarker.on('dragend', () => {
+    const pos = pinMarker.getLatLng();
+    setUserLocation(pos.lat, pos.lng);
+  });
+
+  setUserLocation(lat, lng);
 });
 
 // ── Panel toggle ──

@@ -16,16 +16,54 @@ def parse_sek_per_hour(text: str) -> float | None:
         return None
     # Collect all price matches with their position in the text
     candidates = []
-    for m in re.finditer(r"(\d+)\s*kr[/\s]15\s*min", text):
+    # "X kr/15 min" → X*4 per hour
+    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*15\s*min", text):
         candidates.append((m.start(), float(m.group(1)) * 4))
-    for m in re.finditer(r"(\d+)\s*kr[/\s]30\s*min", text):
+    # "X kr/30 min" → X*2 per hour
+    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*30\s*min", text):
         candidates.append((m.start(), float(m.group(1)) * 2))
-    for m in re.finditer(r"(\d+)\s*kr[/\s]tim", text):
+    # "X kr/tim", "X kr/timme", "X kr tim"
+    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*tim", text):
+        candidates.append((m.start(), float(m.group(1))))
+    # "X kr/h" or "Xkr/h" (compact format)
+    for m in re.finditer(r"(\d+)\s*kr\s*/\s*h\b", text):
+        candidates.append((m.start(), float(m.group(1))))
+    # "X kr/påbörjad timme" (per started hour)
+    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*påbörjad\s*tim", text):
         candidates.append((m.start(), float(m.group(1))))
     if candidates:
         # Return the first occurrence (primary/daytime rate)
         candidates.sort(key=lambda c: c[0])
         return candidates[0][1]
+    return None
+
+
+def parse_time_limit(text: str) -> str | None:
+    """Extract parking time limit from Swedish text. Returns e.g. '24h', '2h', '10min'."""
+    if not text:
+        return None
+    # "24 tim" or "2 timmar" (time limit, not price)
+    m = re.search(r"(\d+)\s*tim(?:mar|me)?\b(?!\s*/?\s*kr)", text)
+    if m:
+        return f"{m.group(1)}h"
+    # "Inom zonen finns tidsbegränsade parkeringar 2tim"
+    m = re.search(r"tidsbegräns\w*\s*(?:parkering\w*)?\s*(\d+)\s*tim", text)
+    if m:
+        return f"{m.group(1)}h"
+    # "10min" or "10 min"
+    m = re.search(r"tidsbegräns\w*\s*(?:parkering\w*)?\s*(\d+)\s*min", text)
+    if m:
+        return f"{m.group(1)}min"
+    return None
+
+
+def parse_max_daily(text: str) -> float | None:
+    """Extract max daily rate from text like 'maxtaxa 30 kr/dag'."""
+    if not text:
+        return None
+    m = re.search(r"maxtaxa\s*(\d+)\s*kr", text, re.I)
+    if m:
+        return float(m.group(1))
     return None
 
 
@@ -65,6 +103,8 @@ def load_easypark() -> list[dict]:
         price_info = detail.get("priceInfo") or ""
         price_text = popup or str(price_info)
         price = parse_sek_per_hour(price_text)
+        time_limit = parse_time_limit(popup)
+        max_daily = parse_max_daily(popup)
 
         area_type = detail.get("areaType", "")
         custom_type = record.get("tileData", {}).get("customAreaType", "")
@@ -76,6 +116,8 @@ def load_easypark() -> list[dict]:
             "lon": round(lon, 6),
             "price_sek_hr": price,
             "price_text": popup.split("\n")[0] if popup else "",
+            "time_limit": time_limit,
+            "max_daily_sek": max_daily,
             "type": classify_type(custom_type or area_type),
             "source": "easypark",
             "operator": detail.get("parkingOperatorName", ""),
@@ -147,6 +189,8 @@ def load_parkster() -> list[dict]:
             "lon": round(float(lon), 6),
             "price_sek_hr": price if price and price < 99999999 else None,
             "price_text": price_text,
+            "time_limit": None,
+            "max_daily_sek": None,
             "type": "street",  # Parkster is primarily street parking
             "source": "parkster",
             "operator": owner.get("name", ""),
@@ -195,6 +239,7 @@ def load_parkering_gbg() -> list[dict]:
         raw = a.get("price_info_raw", [])
         raw_text = " ".join(raw) if isinstance(raw, list) else str(raw or "")
         price = parse_sek_per_hour(raw_text) if raw_text else None
+        time_limit = parse_time_limit(raw_text) if raw_text else None
 
         ptype = a.get("parking_type", "")
 
@@ -205,6 +250,8 @@ def load_parkering_gbg() -> list[dict]:
             "lon": round(lon_val, 6),
             "price_sek_hr": price,
             "price_text": raw_text.split(",")[0] if raw_text else "",
+            "time_limit": time_limit,
+            "max_daily_sek": None,
             "type": classify_type(ptype),
             "source": "parkering_gbg",
             "operator": "Göteborgs Stad",

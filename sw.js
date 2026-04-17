@@ -1,4 +1,4 @@
-const CACHE_NAME = 'parking-gbg-v4';
+const CACHE_NAME = 'parking-gbg-v5';
 const ASSETS = [
   './',
   './index.html',
