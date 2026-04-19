@@ -336,6 +336,7 @@ def load_parkering_gbg() -> list[dict]:
         raw_text = " ".join(raw) if isinstance(raw, list) else str(raw or "")
         price = parse_sek_per_hour(raw_text) if raw_text else None
         time_limit = parse_time_limit(raw_text) if raw_text else None
+        max_daily = parse_max_daily(raw_text) if raw_text else None
 
         ptype = a.get("parking_type", "")
         # timeLimited + free = time-limited free parking (duration on sign only)
@@ -349,10 +350,10 @@ def load_parkering_gbg() -> list[dict]:
             "lat": round(lat_val, 6),
             "lon": round(lon_val, 6),
             "price_sek_hr": price,
-            "price_text": raw_text.split(",")[0] if raw_text else "",
+            "price_text": raw_text.strip().rstrip(",").strip() if raw_text else "",
             "time_limit": time_limit,
             "time_limited_free": is_time_limited_free,
-            "max_daily_sek": None,
+            "max_daily_sek": max_daily,
             "area_code": str(a.get("parking_code", "") or ""),
             "type": classify_type(ptype),
             "source": "parkering_gbg",
