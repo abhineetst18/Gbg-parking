@@ -151,6 +151,14 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
     tariff_path = DATA_DIR / "easypark_prices.json"
     if tariff_path.exists():
         tariff_prices = json.loads(tariff_path.read_text())
+    # Load lot-specific tariff prices (fetched via internal IDs)
+    lot_tariff_path = DATA_DIR / "easypark_lot_prices.json"
+    if lot_tariff_path.exists():
+        lot_prices = json.loads(lot_tariff_path.read_text())
+        # Merge: lot prices fill in gaps not covered by tile-based tariffs
+        for k, v in lot_prices.items():
+            if k not in tariff_prices:
+                tariff_prices[k] = v
 
     results = []
     for ano, record in raw.items():
