@@ -57,8 +57,11 @@ body {
   flex-shrink: 0;
 }
 #header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
+#header .author { font-size: 10px; color: var(--text-dim); text-decoration: none; opacity: 0.6; }
+#header .author:hover { opacity: 1; }
 #header .stats { font-size: 11px; color: var(--text-dim); margin-left: auto; white-space: nowrap; }
-#theme-btn { flex-shrink: 0; }
+#lang-btn, #theme-btn { flex-shrink: 0; background: none; border: none; font-size: 12px; cursor: pointer; padding: 4px 6px; line-height: 1; color: var(--text-dim); font-weight: 600; }
+#lang-btn:hover { color: var(--text); }
 
 /* Map */
 #map {
@@ -163,9 +166,49 @@ body {
   display: inline-block; width: 6px; height: 6px;
   border-radius: 50%; margin-right: 4px; vertical-align: middle;
 }
-.src-easypark { background: #6c5ce7; }
-.src-parkster { background: #00b894; }
-.src-parkering_gbg { background: #fdcb6e; }
+.src-easypark { background: #ec5fa1; }
+.src-parkster { background: #4daa5b; }
+.src-parkering_gbg { background: #387aba; }
+
+/* Source logo badges */
+.src-logo {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  vertical-align: middle;
+  letter-spacing: 0.3px;
+  line-height: 14px;
+}
+.src-logo-easypark { background: #ec5fa1; color: #fff; }
+.src-logo-parkster { background: #4daa5b; color: #fff; }
+.src-logo-parkering_gbg { background: #387aba; color: #fff; }
+.src-logo-epark { background: #00a89e; color: #fff; }
+
+/* Autocomplete dropdown */
+#autocomplete {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 2000;
+  display: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  width: 260px;
+}
+#autocomplete.visible { display: block; }
+.ac-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.ac-item:hover, .ac-item:active { background: var(--surface2); }
+.ac-item .ac-name { font-weight: 500; }
+.ac-item .ac-sub { font-size: 10px; color: var(--text-dim); }
 
 /* Google Maps link input */
 #location-input {
@@ -241,31 +284,19 @@ body {
 /* Radius slider row */
 #radius-row {
   padding: 0 12px 6px;
-  display: none;
+  display: flex;
   align-items: center;
   gap: 8px;
   font-size: 11px;
   color: var(--text-dim);
   flex-shrink: 0;
 }
-#radius-row.visible { display: flex; }
 #radius-slider {
   flex: 1;
   accent-color: var(--accent);
   height: 4px;
 }
 #radius-label { min-width: 44px; text-align: right; font-weight: 600; color: var(--text); }
-
-/* Theme toggle */
-#theme-btn {
-  background: none;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 4px 6px;
-  line-height: 1;
-  flex-shrink: 0;
-}
 
 /* Drop pin marker */
 .pin-marker {
@@ -296,7 +327,9 @@ body {
 
 <div id="header">
   <h1>🅿️ Parking GBG</h1>
+  <a class="author" href="https://github.com/abhineetst18" target="_blank" rel="noopener">by Abhineet</a>
   <span id="stats" class="stats"></span>
+  <button id="lang-btn" title="Toggle language">SV→EN</button>
   <button id="theme-btn" title="Toggle theme">🌙</button>
 </div>
 
@@ -306,7 +339,10 @@ body {
   <div id="panel-header"><div class="handle"></div></div>
   <div id="controls">
     <button class="btn locate" onclick="locateMe()">📍 My Location</button>
-    <input id="location-input" type="text" placeholder="Address, coords, or Maps link...">
+    <div style="position:relative">
+      <input id="location-input" type="text" placeholder="Search address or place..." autocomplete="off">
+      <div id="autocomplete"></div>
+    </div>
     <select id="sort-select">
       <option value="distance">Nearest</option>
       <option value="price">Cheapest</option>
@@ -316,6 +352,7 @@ body {
     <button class="btn filter-btn active" data-source="easypark" onclick="toggleSource(this)">EP</button>
     <button class="btn filter-btn active" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
     <button class="btn filter-btn active" data-source="parkering_gbg" onclick="toggleSource(this)">GBG</button>
+    <button class="btn filter-btn active" data-source="epark" onclick="toggleSource(this)">ePARK</button>
     <button class="btn filter-btn active" data-type="street" onclick="toggleType(this)">Street</button>
     <button class="btn filter-btn active" data-type="garage" onclick="toggleType(this)">Garage</button>
     <button class="btn filter-btn active" data-type="lot" onclick="toggleType(this)">Lot</button>
@@ -324,8 +361,8 @@ body {
   </div>
   <div id="radius-row">
     <span>Radius:</span>
-    <input id="radius-slider" type="range" min="500" max="10000" step="500" value="3000">
-    <span id="radius-label">3 km</span>
+    <input id="radius-slider" type="range" min="200" max="10000" step="100" value="3000">
+    <span id="radius-label">3.0 km</span>
   </div>
   <div id="results"></div>
 </div>
@@ -339,10 +376,69 @@ body {
 let allSpots = [];
 let userLat = null, userLon = null;
 let map, userMarker, clusterGroup;
-let activeSources = new Set(['easypark', 'parkster', 'parkering_gbg']);
+let activeSources = new Set(['easypark', 'parkster', 'parkering_gbg', 'epark']);
 let activeTypes = new Set(['street', 'garage', 'lot', 'ev', 'other']);
 let sortMode = 'distance';
 let searchRadius = 3000; // metres, adjustable
+let lang = 'sv'; // 'sv' or 'en'
+
+// ── Platform detection ──
+const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const _isAndroid = /Android/.test(navigator.userAgent);
+const _isMobile = _isIOS || _isAndroid;
+
+// ── Swedish → English translation ──
+const SV_EN = [
+  // Time expressions (order matters - longer patterns first)
+  [/\balla dagar\b/gi, 'all days'],
+  [/\bhelgfri\b/gi, 'non-holiday'],
+  [/\bmån-fre\b/gi, 'Mon-Fri'],
+  [/\bmån\b/gi, 'Mon'], [/\btis\b/gi, 'Tue'], [/\bons\b/gi, 'Wed'],
+  [/\btor\b/gi, 'Thu'], [/\bfre\b/gi, 'Fri'], [/\blör\b/gi, 'Sat'], [/\bsön\b/gi, 'Sun'],
+  [/\blör-sön\b/gi, 'Sat-Sun'],
+  [/\bmåndagar\b/gi, 'Mondays'], [/\btisdagar\b/gi, 'Tuesdays'],
+  [/\bonsdagar\b/gi, 'Wednesdays'], [/\btorsdagar\b/gi, 'Thursdays'],
+  [/\bfredagar\b/gi, 'Fridays'], [/\blördagar\b/gi, 'Saturdays'],
+  [/\bsöndagar\b/gi, 'Sundays'],
+  [/\bklockan\b/gi, ''],
+  [/\bövrig tid\b/gi, 'other times'],
+  // Pricing
+  [/\bkr\/tim\b/gi, 'SEK/hr'], [/\bkr\/timme\b/gi, 'SEK/hr'], [/\bkr\/h\b/gi, 'SEK/hr'],
+  [/\bkr\/dygn\b/gi, 'SEK/24h'], [/\bkr\/dag\b/gi, 'SEK/day'],
+  [/\bkr\s+per\s+påbörjad\w*\s+timme\b/gi, 'SEK/started hr'],
+  [/\bkr\s*\/?\s*per\s+påbörjad\w*\b/gi, 'SEK/started'],
+  [/\bmaxtaxa\b/gi, 'max rate'],
+  [/\bgratis\b/gi, 'Free'],
+  [/\bavgiftsfri\b/gi, 'free of charge'],
+  // Parking terms
+  [/\bP-förbud\b/gi, 'No parking'],
+  [/\bp-tillstånd\s+erfordras\b/gi, 'permit required'],
+  [/\btillstånd\b/gi, 'permit'],
+  [/\bpåbörjad\w*\b/gi, 'started'],
+  [/\btidsbegräns\w*/gi, 'time-limited'],
+  [/\bserviceavgift\s+kan\s+tillkomma\b/gi, 'service fee may apply'],
+  [/\bladdplats\b/gi, 'charging station'],
+  [/\blåst\s+garage\b/gi, 'locked garage'],
+  [/\bendast\s+för\b/gi, 'only for'],
+  [/\bhyresgäst\w*\b/gi, 'tenants'],
+  [/\bboende\b/gi, 'residents'],
+  [/\banställd\w*\b/gi, 'employees'],
+  [/\bparkering\w*\b/gi, 'parking'],
+  // Units
+  [/\btim(?:mar|me)?\b/gi, 'hr'],
+  [/\bmin\b/gi, 'min'],
+  [/\bdygn\b/gi, '24h'],
+];
+
+function translateSv(text) {
+  if (!text || lang === 'sv') return text;
+  let t = text;
+  for (const [pattern, replacement] of SV_EN) {
+    t = t.replace(pattern, replacement);
+  }
+  // Clean up double spaces
+  return t.replace(/\s{2,}/g, ' ').trim();
+}
 let radiusCircle = null;
 let pinMarker = null;
 let dropPinMode = false;
@@ -397,6 +493,18 @@ function priceClass(price) {
   return 'price-high';
 }
 
+// ── Source labels ──
+const SRC_LABELS = {
+  easypark: 'EasyPark',
+  parkster: 'Parkster',
+  parkering_gbg: 'P.GBG',
+  epark: 'ePARK',
+};
+function srcLogo(source) {
+  const label = SRC_LABELS[source] || source;
+  return `<span class=\"src-logo src-logo-${source}\">${label}</span>`;
+}
+
 // ── Haversine ──
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -422,23 +530,44 @@ function makeMarker(spot) {
   });
   const marker = L.marker([spot.lat, spot.lon], { icon });
 
-  const priceStr = spot.price_sek_hr != null ? `${spot.price_sek_hr} SEK/hr` : (spot.price_text?.includes('Gratis') ? 'Free' : 'Price unknown');
-  const limitStr = spot.time_limit ? `<br>⏱ Max ${spot.time_limit}` : '';
+  let priceStr;
+  if (spot.price_sek_hr != null) {
+    priceStr = `${spot.price_sek_hr} SEK/hr`;
+  } else if (spot.time_limited_free) {
+    priceStr = '🆓 Time-limited free';
+  } else if (spot.price_text?.includes('Gratis')) {
+    priceStr = 'Free';
+  } else {
+    priceStr = 'Price unknown';
+  }
+  const limitStr = spot.time_limit ? `<br>⏱ Max ${spot.time_limit}` : (spot.time_limited_free ? '<br>⏱ Check sign for time limit' : '');
   const maxDailyStr = spot.max_daily_sek ? ` · Max ${spot.max_daily_sek} SEK/day` : '';
   const distStr = spot._dist != null ? `<br>${formatDist(spot._dist)} away` : '';
   const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}&travelmode=walking`;
-  const code = spot.area_code || '';
-  const codeHtml = code ? `<div class="popup-code" style="margin:4px 0;font-size:12px;color:var(--text-dim)">Area: <strong style="color:var(--text);font-size:14px;letter-spacing:1px">${escHtml(code)}</strong> <button onclick="copyCode('${escHtml(code)}')" style="background:var(--surface2);border:1px solid rgba(255,255,255,0.15);color:var(--text);padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;margin-left:4px">📋 Copy</button></div>` : '';
+  const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${spot.lat},${spot.lon}`;
+  const codes = spot.area_codes || {};
+  let codeHtml = '';
+  const codeEntries = Object.entries(codes);
+  if (codeEntries.length) {
+    codeHtml = `<div class="popup-code" style="margin:4px 0;font-size:12px;color:var(--text-dim)">`;
+    for (const [src, code] of codeEntries) {
+      const label = SRC_LABELS[src] || src;
+      codeHtml += `${label}: <strong style="color:var(--text);font-size:14px;letter-spacing:1px">${escHtml(code)}</strong> <button onclick="copyCode('${escHtml(code)}')" style="background:var(--surface2);border:1px solid rgba(255,255,255,0.15);color:var(--text);padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;margin-left:4px">📋 Copy</button><br>`;
+    }
+    codeHtml += `</div>`;
+  }
   const appLinks = buildAppLinks(spot);
+  const srcLogos = (spot.sources || []).map(srcLogo).join(' ');
 
   marker.bindPopup(`
     <div class="popup-name">${escHtml(spot.name)}</div>
     <div class="popup-price">${priceStr}${maxDailyStr}</div>
     ${codeHtml}
     <div class="popup-meta">
-      ${escHtml(spot.price_text)}${limitStr}<br>
-      ${spot.source} · ${spot.type}${distStr}<br>
+      ${srcLogos} ${spot.type}${limitStr}<br>
+      ${escHtml(translateSv(spot.price_text))}${distStr}<br>
       <a href="${navUrl}" target="_blank" rel="noopener">Navigate here →</a>
+      · <a href="${svUrl}" target="_blank" rel="noopener">Street View 👁</a>
       ${appLinks}
     </div>
   `, { maxWidth: 280 });
@@ -462,20 +591,34 @@ function copyCode(code) {
 }
 
 function buildAppLinks(spot) {
-  const code = spot.area_code || '';
-  if (!code) return '';
+  if (!_isMobile) return '';
+  const codes = spot.area_codes || {};
   const links = [];
-  if (spot.source === 'easypark') {
-    // EasyPark deep link: easypark://area/{areaNo}
-    links.push(`<a href="easypark://area/${code}" style="color:var(--accent)">Open EasyPark →</a>`);
-  } else if (spot.source === 'parkster') {
-    // Parkster deep link: parkster://zone/{zoneCode}
-    links.push(`<a href="parkster://zone/${code}" style="color:var(--accent)">Open Parkster →</a>`);
-  } else {
-    // GBG spots - try both apps
-    links.push(`<a href="easypark://area/${code}" style="color:var(--accent)">EasyPark</a>`);
-    links.push(`<a href="parkster://zone/${code}" style="color:var(--accent)">Parkster</a>`);
+  // EasyPark deep link
+  const epCode = codes.easypark || (!codes.parkster && !codes.easypark ? codes.parkering_gbg : null);
+  if (epCode) {
+    links.push(`<a href="easypark://area/${epCode}" style="color:var(--accent)">Open EasyPark</a>`);
   }
+  // Parkster deep link
+  const pkCode = codes.parkster || (!codes.parkster && !codes.easypark ? codes.parkering_gbg : null);
+  if (pkCode) {
+    links.push(`<a href="parkster://zone/${pkCode}" style="color:var(--accent)">Open Parkster</a>`);
+  }
+  // P.GBG app (no deep link scheme — link to store)
+  if (codes.parkering_gbg) {
+    const storeUrl = _isIOS
+      ? 'https://apps.apple.com/se/app/parkering-g%C3%B6teborg/id1184264972'
+      : 'https://play.google.com/store/apps/details?id=se.goteborg.pbolaget.android';
+    links.push(`<a href="${storeUrl}" target="_blank" rel="noopener" style="color:var(--accent)">Open P.GBG</a>`);
+  }
+  // ePARK app (link to store)
+  if (codes.epark) {
+    const storeUrl = _isIOS
+      ? 'https://apps.apple.com/se/app/epark/id500644505'
+      : 'https://play.google.com/store/apps/details?id=se.netix.eparkera';
+    links.push(`<a href="${storeUrl}" target="_blank" rel="noopener" style="color:var(--accent)">Open ePARK</a>`);
+  }
+  if (!links.length) return '';
   return '<br>' + links.join(' · ');
 }
 
@@ -504,7 +647,7 @@ async function loadData() {
 // ── Refresh map + list ──
 function refreshMap() {
   const filtered = allSpots.filter(s =>
-    activeSources.has(s.source) && activeTypes.has(s.type)
+    (s.sources || []).some(src => activeSources.has(src)) && activeTypes.has(s.type)
   );
 
   // Compute distances
@@ -516,15 +659,15 @@ function refreshMap() {
     filtered.forEach(s => { s._dist = null; });
   }
 
-  // Sort — when sorting by price, limit to spots within radius if user location is set
+  // Filter by radius when user location is set
+  let inRadius = filtered;
+  if (userLat != null) {
+    inRadius = filtered.filter(s => s._dist != null && s._dist <= searchRadius);
+  }
+
   let sorted;
   if (sortMode === 'price') {
-    let pool = filtered;
-    if (userLat != null) {
-      pool = filtered.filter(s => s._dist != null && s._dist <= searchRadius);
-      if (pool.length === 0) pool = filtered; // fallback if nothing nearby
-    }
-    sorted = [...pool].sort((a, b) => {
+    sorted = [...inRadius].sort((a, b) => {
       const pa = a.price_sek_hr ?? 99999;
       const pb = b.price_sek_hr ?? 99999;
       if (pa !== pb) return pa - pb;
@@ -532,7 +675,7 @@ function refreshMap() {
     });
   } else {
     if (userLat != null) {
-      sorted = [...filtered].sort((a, b) => (a._dist ?? 99999) - (b._dist ?? 99999));
+      sorted = [...inRadius].sort((a, b) => (a._dist ?? 99999) - (b._dist ?? 99999));
     } else {
       sorted = [...filtered].sort((a, b) => (a.price_sek_hr ?? 99999) - (b.price_sek_hr ?? 99999));
     }
@@ -547,17 +690,25 @@ function refreshMap() {
   const resultsEl = document.getElementById('results');
   const top = sorted.slice(0, 100);
   resultsEl.innerHTML = top.map(s => {
-    const priceStr = s.price_sek_hr != null ? `${s.price_sek_hr}` : (s.price_text?.includes('Gratis') ? 'Free' : '?');
+    let priceStr;
+    if (s.price_sek_hr != null) { priceStr = `${s.price_sek_hr}`; }
+    else if (s.time_limited_free) { priceStr = '🆓'; }
+    else if (s.price_text?.includes('Gratis')) { priceStr = 'Free'; }
+    else { priceStr = '?'; }
+    const priceUnit = s.time_limited_free ? '<span style="font-size:9px;font-weight:400">free</span>' : '<span style="font-size:9px;font-weight:400">kr/h</span>';
     const distStr = s._dist != null ? formatDist(s._dist) : '';
-    const srcClass = `src-${s.source}`;
-    const limitBadge = s.time_limit ? `<span style="color:var(--yellow);font-size:10px"> ⏱${s.time_limit}</span>` : '';
-    const codeBadge = s.area_code ? `<span style="color:var(--text-dim);font-size:10px;font-family:monospace"> #${escHtml(s.area_code)}</span>` : '';
+    let limitBadge = s.time_limit ? `<span style="color:var(--yellow);font-size:10px"> ⏱${s.time_limit}</span>` : '';
+    if (!limitBadge && s.time_limited_free) limitBadge = '<span style="color:var(--yellow);font-size:10px"> ⏱ check sign</span>';
+    const codes = s.area_codes || {};
+    const firstCode = Object.values(codes)[0] || '';
+    const codeBadge = firstCode ? `<span style="color:var(--text-dim);font-size:10px;font-family:monospace"> #${escHtml(firstCode)}</span>` : '';
+    const srcLogos = (s.sources || []).map(srcLogo).join(' ');
     return `
       <div class="result-card" onclick="flyTo(${s.lat},${s.lon},'${s.id}')">
-        <div class="price-badge ${priceClass(s.price_sek_hr)}">${priceStr}<br><span style="font-size:9px;font-weight:400">kr/h</span></div>
+        <div class="price-badge ${priceClass(s.price_sek_hr)}">${priceStr}<br>${priceUnit}</div>
         <div class="info">
           <div class="name">${escHtml(s.name)}${limitBadge}${codeBadge}</div>
-          <div class="meta"><span class="source-dot ${srcClass}"></span>${s.source} · ${s.type}${s.price_text ? ' · '+escHtml(s.price_text) : ''}</div>
+          <div class="meta">${srcLogos} ${s.type}${s.price_text ? ' · '+escHtml(translateSv(s.price_text)) : ''}</div>
         </div>
         <div class="distance">${distStr}</div>
       </div>
@@ -647,9 +798,60 @@ async function geocodeAddress(query) {
     return false;
   } finally {
     input.style.borderColor = '';
-    input.placeholder = 'Address, coords, or Maps link...';
+    input.placeholder = 'Search address or place...';
   }
 }
+
+// ── Autocomplete ──
+let acTimer = null;
+const acEl = document.getElementById('autocomplete');
+
+function hideAutocomplete() { acEl.classList.remove('visible'); acEl.innerHTML = ''; }
+
+async function fetchSuggestions(q) {
+  // Widen viewbox to include Mölndal, Partille, Kungälv area
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&viewbox=11.6,57.55,12.3,57.9&bounded=0&limit=5&addressdetails=1`;
+  const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+  return resp.json();
+}
+
+function showSuggestions(results) {
+  if (!results.length) { hideAutocomplete(); return; }
+  acEl.innerHTML = results.map((r, i) => {
+    const parts = r.display_name.split(',');
+    const name = parts[0].trim();
+    const sub = parts.slice(1, 3).map(s => s.trim()).join(', ');
+    return `<div class="ac-item" data-idx="${i}"><div class="ac-name">${escHtml(name)}</div><div class="ac-sub">${escHtml(sub)}</div></div>`;
+  }).join('');
+  acEl.classList.add('visible');
+  acEl.querySelectorAll('.ac-item').forEach((el, i) => {
+    el.addEventListener('click', () => {
+      const r = results[i];
+      setUserLocation(parseFloat(r.lat), parseFloat(r.lon));
+      document.getElementById('location-input').value = results[i].display_name.split(',')[0].trim();
+      hideAutocomplete();
+    });
+  });
+}
+
+document.getElementById('location-input').addEventListener('input', e => {
+  const val = e.target.value.trim();
+  clearTimeout(acTimer);
+  if (val.length < 3) { hideAutocomplete(); return; }
+  // Don't autocomplete coords or URLs
+  if (/^\d+\.\d+/.test(val) || /^https?:\/\//.test(val)) { hideAutocomplete(); return; }
+  acTimer = setTimeout(async () => {
+    try {
+      const results = await fetchSuggestions(val);
+      showSuggestions(results);
+    } catch { hideAutocomplete(); }
+  }, 350);
+});
+
+// Hide on blur (small delay so click events fire first)
+document.getElementById('location-input').addEventListener('blur', () => {
+  setTimeout(hideAutocomplete, 200);
+});
 
 function isShortGoogleLink(text) {
   return /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl)\//i.test(text.trim());
@@ -657,6 +859,7 @@ function isShortGoogleLink(text) {
 
 document.getElementById('location-input').addEventListener('keydown', async e => {
   if (e.key === 'Enter') {
+    hideAutocomplete();
     const val = e.target.value.trim();
     if (!val) return;
 
@@ -688,7 +891,7 @@ document.getElementById('location-input').addEventListener('keydown', async e =>
 function toggleSource(btn) {
   const src = btn.dataset.source;
   if (src === 'all') {
-    const allActive = activeSources.size >= 3;
+    const allActive = activeSources.size >= 4;
     document.querySelectorAll('.filter-btn[data-source]').forEach(b => {
       if (b.dataset.source !== 'all') {
         b.classList.toggle('active', !allActive);
@@ -714,25 +917,24 @@ function toggleType(btn) {
 
 document.getElementById('sort-select').addEventListener('change', e => {
   sortMode = e.target.value;
-  const row = document.getElementById('radius-row');
-  if (sortMode === 'price') row.classList.add('visible');
-  else row.classList.remove('visible');
   updateRadiusCircle();
   refreshMap();
 });
 
 // ── Radius slider ──
+let _radiusTimer = null;
 document.getElementById('radius-slider').addEventListener('input', e => {
   searchRadius = parseInt(e.target.value);
   const label = searchRadius >= 1000 ? `${(searchRadius/1000).toFixed(1)} km` : `${searchRadius} m`;
   document.getElementById('radius-label').textContent = label;
   updateRadiusCircle();
-  refreshMap();
+  clearTimeout(_radiusTimer);
+  _radiusTimer = setTimeout(refreshMap, 80);
 });
 
 function updateRadiusCircle() {
   if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
-  if (userLat != null && sortMode === 'price') {
+  if (userLat != null) {
     radiusCircle = L.circle([userLat, userLon], {
       radius: searchRadius,
       color: '#e94560',
@@ -743,6 +945,14 @@ function updateRadiusCircle() {
     }).addTo(map);
   }
 }
+
+// ── Language toggle ──
+const langBtn = document.getElementById('lang-btn');
+langBtn.addEventListener('click', () => {
+  lang = lang === 'sv' ? 'en' : 'sv';
+  langBtn.textContent = lang === 'sv' ? 'SV→EN' : 'EN→SV';
+  refreshMap();
+});
 
 // ── Theme toggle (dark → light → satellite → dark) ──
 const themeBtn = document.getElementById('theme-btn');

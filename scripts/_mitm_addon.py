@@ -52,7 +52,8 @@ def _is_interesting(host: str) -> bool:
     host_lower = host.lower()
     interesting_keywords = [
         "easypark", "park", "zone", "area", "pricing",
-        "parking", "parkster", "aimo", "qpark",
+        "parking", "parkster", "aimo", "qpark", "epark",
+        "mobill", "fastpark",
     ]
     return any(kw in host_lower for kw in interesting_keywords)
 
@@ -67,13 +68,23 @@ def response(flow: http.HTTPFlow) -> None:
     req_headers = dict(flow.request.headers)
     resp_body = b""
     resp_body_preview = ""
+    req_body_preview = ""
+
+    # Capture request body for POST/PUT/PATCH
+    if flow.request.content and flow.request.method in ("POST", "PUT", "PATCH"):
+        req_ct = flow.request.headers.get("content-type", "")
+        if "json" in req_ct or "text" in req_ct or "form" in req_ct:
+            try:
+                req_body_preview = flow.request.content.decode("utf-8", errors="replace")[:2000]
+            except Exception:
+                req_body_preview = f"<binary, {len(flow.request.content)} bytes>"
 
     if flow.response and flow.response.content:
         resp_body = flow.response.content
         content_type = flow.response.headers.get("content-type", "")
         if "json" in content_type or "text" in content_type:
             try:
-                resp_body_preview = resp_body.decode("utf-8", errors="replace")[:2000]
+                resp_body_preview = resp_body.decode("utf-8", errors="replace")[:50000]
             except Exception:
                 resp_body_preview = f"<binary, {len(resp_body)} bytes>"
         else:
@@ -87,6 +98,7 @@ def response(flow: http.HTTPFlow) -> None:
         "query": flow.request.query.fields if flow.request.query else [],
         "status": flow.response.status_code if flow.response else None,
         "request_headers": req_headers,
+        "request_body_preview": req_body_preview,
         "response_headers": dict(flow.response.headers) if flow.response else {},
         "response_body_preview": resp_body_preview,
     }
