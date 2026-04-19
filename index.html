@@ -314,7 +314,7 @@ body {
   border-radius: 6px; letter-spacing: 0.3px; vertical-align: middle;
 }
 .type-badge.type-street { background: #3b82f6; color: #fff; }
-.type-badge.type-lot    { background: #f59e0b; color: #000; }
+.type-badge.type-lot    { background: transparent; color: #f59e0b; border: 1.5px solid #f59e0b; }
 .type-badge.type-garage { background: #8b5cf6; color: #fff; }
 .type-badge.type-ev     { background: #10b981; color: #fff; }
 .type-badge.type-other  { background: #6b7280; color: #fff; }
@@ -655,9 +655,10 @@ function srcLogo(source) {
 }
 
 const TYPE_ICONS = { street: '🛣️', lot: '🅿️', garage: '🏢', ev: '⚡', other: '📍' };
+const TYPE_LABELS = { street: 'Street Parking', lot: 'Parking Lot', garage: 'Garage', ev: 'EV', other: 'Other' };
 function typeBadge(type) {
   const icon = TYPE_ICONS[type] || '';
-  const label = type.charAt(0).toUpperCase() + type.slice(1);
+  const label = TYPE_LABELS[type] || type.charAt(0).toUpperCase() + type.slice(1);
   return `<span class="type-badge type-${type}">${icon} ${label}</span>`;
 }
 
