@@ -52,21 +52,26 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   z-index: 1000;
   flex-shrink: 0;
 }
+@media (max-width: 480px) {
+  #header { padding: 6px 8px; gap: 6px; }
+  #header .author { display: none; }
+  #header h1 { font-size: 14px; }
+}
 #header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
 #header .author { font-size: 10px; color: var(--text-dim); text-decoration: none; opacity: 0.6; }
 #header .author:hover { opacity: 1; }
-#header .stats { font-size: 11px; color: var(--text-dim); margin-left: auto; white-space: nowrap; }
-#lang-btn, #theme-btn { flex-shrink: 0; background: none; border: none; font-size: 12px; cursor: pointer; padding: 4px 6px; line-height: 1; color: var(--text-dim); font-weight: 600; }
-#lang-btn:hover { color: var(--text); }
-#map-style-toggle { flex-shrink: 0; display: flex; gap: 2px; background: rgba(255,255,255,0.08); border-radius: 8px; padding: 2px; }
-#map-style-toggle button { background: none; border: none; font-size: 11px; cursor: pointer; padding: 3px 6px; border-radius: 6px; color: var(--text-dim); line-height: 1; }
-#map-style-toggle button.active { background: var(--surface2); color: var(--text); }
-[data-theme="light"] #map-style-toggle { background: rgba(0,0,0,0.06); }
-[data-theme="light"] #map-style-toggle button.active { background: #d0d2d6; }
+#header .stats { font-size: 11px; color: var(--text-dim); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hdr-btn { flex-shrink: 0; background: none; border: 1px solid rgba(255,255,255,0.1); font-size: 14px; cursor: pointer; padding: 3px 7px; border-radius: 8px; line-height: 1; color: var(--text-dim); transition: all 0.15s; }
+.hdr-btn:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.hdr-btn:active { transform: scale(0.92); }
+.hdr-btn.active { background: var(--surface2); border-color: var(--accent); }
+[data-theme="light"] .hdr-btn { border-color: rgba(0,0,0,0.12); }
+[data-theme="light"] .hdr-btn:hover { background: rgba(0,0,0,0.04); }
 
 /* Map */
 #map {
@@ -119,10 +124,16 @@ body {
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
+.btn:hover { background: rgba(255,255,255,0.12); }
 .btn:active { transform: scale(0.95); }
-.btn.active { background: var(--accent); border-color: var(--accent); }
-.btn.locate { background: var(--green); border-color: var(--green); }
+.btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.locate { background: var(--green); border-color: var(--green); color: #fff; }
+[data-theme="light"] .btn { border-color: rgba(0,0,0,0.1); }
+[data-theme="light"] .btn:hover { background: rgba(0,0,0,0.06); }
+[data-theme="light"] .btn.active { background: var(--accent); color: #fff; }
+[data-theme="light"] .btn.locate { background: var(--green); color: #fff; }
 #sort-select {
   background: var(--surface2);
   border: 1px solid rgba(255,255,255,0.1);
@@ -130,7 +141,9 @@ body {
   padding: 6px 10px;
   border-radius: 20px;
   font-size: 12px;
+  cursor: pointer;
 }
+[data-theme="light"] #sort-select { border-color: rgba(0,0,0,0.1); }
 
 /* Results list */
 #results {
@@ -148,8 +161,10 @@ body {
   gap: 10px;
   cursor: pointer;
   transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
-.result-card:active { background: var(--surface2); }
+.result-card:hover { background: var(--surface2); }
+.result-card:active { background: var(--surface2); transform: scale(0.99); }
 .result-card .price-badge {
   min-width: 52px;
   text-align: center;
@@ -273,8 +288,40 @@ body {
 .leaflet-popup-content { margin: 10px 14px !important; font-size: 13px; }
 .leaflet-popup-content .popup-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
 .leaflet-popup-content .popup-price { color: var(--green); font-weight: 700; font-size: 16px; }
-.leaflet-popup-content .popup-meta { color: var(--text-dim); font-size: 11px; margin-top: 4px; }
+.leaflet-popup-content .popup-meta { color: var(--text-dim); font-size: 11px; margin-top: 6px; line-height: 1.5; }
 .leaflet-popup-content a { color: var(--accent); }
+
+/* Popup code rows */
+.popup-codes { margin: 6px 0; display: flex; flex-direction: column; gap: 4px; }
+.code-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.code-row .src-logo { flex-shrink: 0; }
+.code-num { font-family: 'SF Mono', 'Menlo', monospace; font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: 1px; }
+.popup-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--surface2); border: 1px solid rgba(255,255,255,0.12);
+  color: var(--text); padding: 3px 8px; border-radius: 10px;
+  font-size: 11px; cursor: pointer; white-space: nowrap;
+  text-decoration: none; line-height: 1.2; transition: background 0.15s;
+}
+.popup-pill:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.popup-pill:active { transform: scale(0.95); }
+[data-theme="light"] .popup-pill { border-color: rgba(0,0,0,0.12); }
+[data-theme="light"] .popup-pill:hover { background: var(--accent); color: #fff; }
+
+/* Type badges */
+.type-badge {
+  display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px;
+  border-radius: 6px; letter-spacing: 0.3px; vertical-align: middle;
+}
+.type-badge.type-street { background: #3b82f6; color: #fff; }
+.type-badge.type-lot    { background: #f59e0b; color: #000; }
+.type-badge.type-garage { background: #8b5cf6; color: #fff; }
+.type-badge.type-ev     { background: #10b981; color: #fff; }
+.type-badge.type-other  { background: #6b7280; color: #fff; }
+
+/* Popup actions row */
+.popup-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.popup-actions .popup-pill { font-size: 12px; padding: 5px 10px; }
 
 /* Cluster override */
 .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
@@ -334,12 +381,9 @@ body {
   <h1>🅿️ Parking GBG</h1>
   <a class="author" href="https://github.com/abhineetst18" target="_blank" rel="noopener">by Abhineet</a>
   <span id="stats" class="stats"></span>
-  <button id="lang-btn" title="Toggle language">SV→EN</button>
-  <div id="map-style-toggle">
-    <button data-style="dark" class="active" title="Dark map">🌙</button>
-    <button data-style="light" title="Light map">☀️</button>
-    <button data-style="satellite" title="Satellite">🛰️</button>
-  </div>
+  <button id="lang-btn" class="hdr-btn" title="Toggle language">🇸🇪</button>
+  <button id="theme-btn" class="hdr-btn" title="Toggle light/dark mode">☀️</button>
+  <button id="satellite-btn" class="hdr-btn" title="Toggle satellite view">🛰️</button>
 </div>
 
 <div id="map"></div>
@@ -362,11 +406,12 @@ body {
     <button class="btn filter-btn active" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
     <button class="btn filter-btn active" data-source="parkering_gbg" onclick="toggleSource(this)">GBG</button>
     <button class="btn filter-btn active" data-source="epark" onclick="toggleSource(this)">ePARK</button>
-    <button class="btn filter-btn active" data-type="street" onclick="toggleType(this)">Street</button>
-    <button class="btn filter-btn active" data-type="garage" onclick="toggleType(this)">Garage</button>
-    <button class="btn filter-btn active" data-type="lot" onclick="toggleType(this)">Lot</button>
-    <button class="btn filter-btn active" data-type="ev" onclick="toggleType(this)">EV</button>
+    <button class="btn filter-btn active" data-type="street" onclick="toggleType(this)">🛣️ Street</button>
+    <button class="btn filter-btn active" data-type="garage" onclick="toggleType(this)">🏢 Garage</button>
+    <button class="btn filter-btn active" data-type="lot" onclick="toggleType(this)">🅿️ Lot</button>
+    <button class="btn filter-btn" data-type="ev" onclick="toggleType(this)">⚡ EV</button>
     <button class="btn filter-btn active" data-type="other" onclick="toggleType(this)">Other</button>
+    <button class="btn filter-btn" id="hide-free-btn" onclick="toggleHideFree(this)">🚫 Free</button>
   </div>
   <div id="radius-row">
     <span>Radius:</span>
@@ -386,7 +431,8 @@ let allSpots = [];
 let userLat = null, userLon = null;
 let map, userMarker, clusterGroup;
 let activeSources = new Set(['easypark', 'parkster', 'parkering_gbg', 'epark']);
-let activeTypes = new Set(['street', 'garage', 'lot', 'ev', 'other']);
+let activeTypes = new Set(['street', 'garage', 'lot', 'other']);
+let hideFree = false;
 let sortMode = 'distance';
 let searchRadius = 3000; // metres, adjustable
 let lang = 'sv'; // 'sv' or 'en'
@@ -432,6 +478,99 @@ const SV_EN = [
   [/\bhyresgäst\w*\b/gi, 'tenants'],
   [/\bboende\b/gi, 'residents'],
   [/\banställd\w*\b/gi, 'employees'],
+  // Phrase patterns (longest first)
+  [/\bper påbörjad timme\b/gi, 'per started hour'],
+  [/\bdygnet runt\b/gi, '24/7'],
+  [/\bse skyltning på plats\b/gi, 'see signage on site'],
+  [/\bkontrollera skyltning\b/gi, 'check signage'],
+  [/\bej avslutad session\b/gi, 'unfinished session'],
+  [/\bstarta parkering\b/gi, 'start parking'],
+  [/\bmaxhöjd (\d)/gi, 'max height $1'],
+  // Calendar/Time
+  [/\bhelgfria vardagar\b/gi, 'non-holiday weekdays'],
+  [/\bvardagar\b/gi, 'weekdays'],
+  [/\bhelgdagar\b/gi, 'public holidays'],
+  [/\bhelg\b/gi, 'weekend/holiday'],
+  [/\bdagtid\b/gi, 'daytime'],
+  [/\bkvällstid\b/gi, 'evening'],
+  [/\bkväll\b/gi, 'evening'],
+  [/\bnatt\b/gi, 'night'],
+  [/\bdagar\b/gi, 'days'],
+  [/\bdag\b/gi, 'day'],
+  [/\bveckor\b/gi, 'weeks'],
+  [/\bmånad\b/gi, 'month'],
+  [/\befter\b/gi, 'after'],
+  [/\bföre\b/gi, 'before'],
+  [/\bmellan\b/gi, 'between'],
+  [/\bunder\b/gi, 'during'],
+  [/\bfrån\b/gi, 'from'],
+  [/\btill\b/gi, 'to'],
+  [/\bsamt\b/gi, 'and also'],
+  [/\boch\b/gi, 'and'],
+  [/\beller\b/gi, 'or'],
+  [/\bjämna\b/gi, 'even'],
+  [/\budda\b/gi, 'odd'],
+  // Parking/Access (longest first)
+  [/\bavgiftsfritt\b/gi, 'free of charge'],
+  [/\bavgiftsparkering\b/gi, 'paid parking'],
+  [/\bparkeringsavgift\b/gi, 'parking fee'],
+  [/\bparkeringstid\b/gi, 'parking time'],
+  [/\bparkeringstillstånd\b/gi, 'parking permit'],
+  [/\bparkeringen\b/gi, 'the parking'],
+  [/\bkorttidsparkering\b/gi, 'short-term parking'],
+  [/\blångtidsparkering\b/gi, 'long-term parking'],
+  [/\bpersonalp\w*\b/gi, 'staff parking'],
+  [/\bavgift\b/gi, 'fee'],
+  [/\bbesökare\b/gi, 'visitors'],
+  [/\bbesökande\b/gi, 'visitors'],
+  [/\bgäster\b/gi, 'guests'],
+  [/\bfordon\b/gi, 'vehicles'],
+  [/\bstängda\b/gi, 'closed'],
+  [/\bstängt\b/gi, 'closed'],
+  [/\böppettider\b/gi, 'opening hours'],
+  [/\böppet\b/gi, 'open'],
+  [/\bingång\b/gi, 'entrance'],
+  [/\binfart\b/gi, 'entry'],
+  [/\bingen\b/gi, 'no'],
+  [/\bgaraget\b/gi, 'the garage'],
+  [/\bgäller\b/gi, 'applies'],
+  [/\bkräver\b/gi, 'requires'],
+  [/\bkrävs\b/gi, 'required'],
+  [/\berfordras\b/gi, 'required'],
+  [/\bregistrering\b/gi, 'registration'],
+  [/\binloggning\b/gi, 'login'],
+  [/\bdygnsbiljett\b/gi, '24h ticket'],
+  [/\bmånadsbiljett\b/gi, 'monthly ticket'],
+  [/\bperiodbiljett\b/gi, 'period ticket'],
+  [/\bbiljett\b/gi, 'ticket'],
+  [/\bskyltar\b/gi, 'signs'],
+  [/\bskyltning\b/gi, 'signage'],
+  [/\bkontrollera\b/gi, 'check'],
+  [/\bnotera\b/gi, 'note'],
+  [/\bobs\b/gi, 'NB'],
+  [/\bmaxhöjd\b/gi, 'max height'],
+  [/\bmaxpris\b/gi, 'max price'],
+  [/\bmaxtid\b/gi, 'max time'],
+  [/\bserviceavgift\b/gi, 'service fee'],
+  [/\beldebitering\b/gi, 'electricity charge'],
+  [/\bladdning\b/gi, 'charging'],
+  [/\bfritt\b/gi, 'free'],
+  [/\bfria\b/gi, 'free'],
+  [/\bfri\b/gi, 'free'],
+  [/\bförsta\b/gi, 'first'],
+  [/\bdärefter\b/gi, 'thereafter'],
+  [/\breserverat\b/gi, 'reserved'],
+  [/\bsärskilt\b/gi, 'special'],
+  [/\bplatser\b/gi, 'spots'],
+  [/\bplatsen\b/gi, 'the spot'],
+  [/\bplats\b/gi, 'spot'],
+  [/\bomgående\b/gi, 'immediately'],
+  [/\bzon\b/gi, 'zone'],
+  [/\bomr[åa]det\b/gi, 'the area'],
+  [/\bdigitalt?\b/gi, 'digitally'],
+  [/\bundantag\b/gi, 'exception'],
+  [/\btillfälligt\b/gi, 'temporarily'],
+  [/\bupphör\b/gi, 'expires'],
   [/\bparkering\w*\b/gi, 'parking'],
   // Units
   [/\btim(?:mar|me)?\b/gi, 'hr'],
@@ -451,7 +590,8 @@ function translateSv(text) {
 let radiusCircle = null;
 let pinMarker = null;
 let dropPinMode = false;
-let currentTheme = 'dark'; // 'dark', 'light', 'satellite'
+let isDark = true;
+let isSatellite = false;
 
 // ── Map init ──
 map = L.map('map', {
@@ -514,6 +654,13 @@ function srcLogo(source) {
   return `<span class=\"src-logo src-logo-${source}\">${label}</span>`;
 }
 
+const TYPE_ICONS = { street: '🛣️', lot: '🅿️', garage: '🏢', ev: '⚡', other: '📍' };
+function typeBadge(type) {
+  const icon = TYPE_ICONS[type] || '';
+  const label = type.charAt(0).toUpperCase() + type.slice(1);
+  return `<span class="type-badge type-${type}">${icon} ${label}</span>`;
+}
+
 // ── Haversine ──
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -558,26 +705,30 @@ function makeMarker(spot) {
   let codeHtml = '';
   const codeEntries = Object.entries(codes);
   if (codeEntries.length) {
-    codeHtml = `<div class="popup-code" style="margin:4px 0;font-size:12px;color:var(--text-dim)">`;
+    codeHtml = `<div class="popup-codes">`;
     for (const [src, code] of codeEntries) {
-      const label = SRC_LABELS[src] || src;
-      codeHtml += `${label}: <strong style="color:var(--text);font-size:14px;letter-spacing:1px">${escHtml(code)}</strong> <button onclick="copyCode('${escHtml(code)}')" style="background:var(--surface2);border:1px solid rgba(255,255,255,0.15);color:var(--text);padding:2px 8px;border-radius:10px;font-size:11px;cursor:pointer;margin-left:4px">📋 Copy</button><br>`;
+      const logo = srcLogo(src);
+      const appBtn = _buildAppBtn(src, code);
+      codeHtml += `<div class="code-row">${logo} <span class="code-num">${escHtml(code)}</span> <button class="popup-pill" onclick="copyCode('${escHtml(code)}',this)">📋</button>${appBtn}</div>`;
     }
     codeHtml += `</div>`;
   }
-  const appLinks = buildAppLinks(spot);
-  const srcLogos = (spot.sources || []).map(srcLogo).join(' ');
+
+  // Type + sources summary (only if no codes show the sources already)
+  const uncodedSrcs = (spot.sources || []).filter(s => !codes[s]);
+  const srcSummary = uncodedSrcs.map(srcLogo).join(' ');
 
   marker.bindPopup(`
     <div class="popup-name">${escHtml(spot.name)}</div>
     <div class="popup-price">${priceStr}${maxDailyStr}</div>
     ${codeHtml}
     <div class="popup-meta">
-      ${srcLogos} ${spot.type}${limitStr}<br>
-      ${escHtml(translateSv(spot.price_text))}${distStr}<br>
-      <a href="${navUrl}" target="_blank" rel="noopener">Navigate here →</a>
-      · <a href="${svUrl}" target="_blank" rel="noopener">Street View 👁</a>
-      ${appLinks}
+      ${srcSummary} ${typeBadge(spot.type)}${limitStr}<br>
+      ${escHtml(translateSv(spot.price_text))}${distStr}
+    </div>
+    <div class="popup-actions">
+      <a class="popup-pill" href="${navUrl}" target="_blank" rel="noopener">🚶 Navigate</a>
+      <a class="popup-pill" href="${svUrl}" target="_blank" rel="noopener">👁️ Street View</a>
     </div>
   `, { maxWidth: 280 });
 
@@ -585,50 +736,42 @@ function makeMarker(spot) {
   return marker;
 }
 
-function copyCode(code) {
+function copyCode(code, btn) {
   navigator.clipboard.writeText(code).then(() => {
-    // Brief visual feedback
-    const btns = document.querySelectorAll('.popup-code button');
-    btns.forEach(b => { b.textContent = '✓ Copied'; setTimeout(() => b.textContent = '📋 Copy', 1500); });
+    if (btn) { const orig = btn.innerHTML; btn.textContent = '✓'; setTimeout(() => btn.innerHTML = orig, 1200); }
   }).catch(() => {
-    // Fallback for older browsers
     const ta = document.createElement('textarea');
     ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.select(); document.execCommand('copy');
     document.body.removeChild(ta);
+    if (btn) { const orig = btn.innerHTML; btn.textContent = '✓'; setTimeout(() => btn.innerHTML = orig, 1200); }
   });
 }
 
-function buildAppLinks(spot) {
-  if (!_isMobile) return '';
-  const codes = spot.area_codes || {};
-  const links = [];
-  // EasyPark deep link
-  const epCode = codes.easypark || (!codes.parkster && !codes.easypark ? codes.parkering_gbg : null);
-  if (epCode) {
-    links.push(`<a href="easypark://area/${epCode}" style="color:var(--accent)">Open EasyPark</a>`);
+function _buildAppBtn(src, code) {
+  if (src === 'easypark') {
+    if (_isMobile) return ` <a class="popup-pill" href="easypark://area/${code}">▶ Open</a>`;
+    return '';
   }
-  // Parkster deep link
-  const pkCode = codes.parkster || (!codes.parkster && !codes.easypark ? codes.parkering_gbg : null);
-  if (pkCode) {
-    links.push(`<a href="parkster://zone/${pkCode}" style="color:var(--accent)">Open Parkster</a>`);
+  if (src === 'parkster') {
+    if (_isMobile) return ` <a class="popup-pill" href="parkster://zone/${code}">▶ Open</a>`;
+    return '';
   }
-  // P.GBG app (no deep link scheme — link to store)
-  if (codes.parkering_gbg) {
-    const storeUrl = _isIOS
+  if (src === 'parkering_gbg') {
+    const url = _isIOS
       ? 'https://apps.apple.com/se/app/parkering-g%C3%B6teborg/id1184264972'
-      : 'https://play.google.com/store/apps/details?id=se.goteborg.pbolaget.android';
-    links.push(`<a href="${storeUrl}" target="_blank" rel="noopener" style="color:var(--accent)">Open P.GBG</a>`);
+      : _isAndroid ? 'https://play.google.com/store/apps/details?id=se.goteborg.pbolaget.android' : '';
+    if (url) return ` <a class="popup-pill" href="${url}" target="_blank" rel="noopener">▶ Open</a>`;
+    return '';
   }
-  // ePARK app (link to store)
-  if (codes.epark) {
-    const storeUrl = _isIOS
+  if (src === 'epark') {
+    const url = _isIOS
       ? 'https://apps.apple.com/se/app/epark/id500644505'
-      : 'https://play.google.com/store/apps/details?id=se.netix.eparkera';
-    links.push(`<a href="${storeUrl}" target="_blank" rel="noopener" style="color:var(--accent)">Open ePARK</a>`);
+      : _isAndroid ? 'https://play.google.com/store/apps/details?id=se.netix.eparkera' : '';
+    if (url) return ` <a class="popup-pill" href="${url}" target="_blank" rel="noopener">▶ Open</a>`;
+    return '';
   }
-  if (!links.length) return '';
-  return '<br>' + links.join(' · ');
+  return '';
 }
 
 function escHtml(s) {
@@ -657,6 +800,7 @@ async function loadData() {
 function refreshMap() {
   const filtered = allSpots.filter(s =>
     (s.sources || []).some(src => activeSources.has(src)) && activeTypes.has(s.type)
+    && (!hideFree || s.price_sek_hr !== 0)
   );
 
   // Compute distances
@@ -717,7 +861,7 @@ function refreshMap() {
         <div class="price-badge ${priceClass(s.price_sek_hr)}">${priceStr}<br>${priceUnit}</div>
         <div class="info">
           <div class="name">${escHtml(s.name)}${limitBadge}${codeBadge}</div>
-          <div class="meta">${srcLogos} ${s.type}${s.price_text ? ' · '+escHtml(translateSv(s.price_text)) : ''}</div>
+          <div class="meta">${srcLogos} ${typeBadge(s.type)}${s.price_text ? ' · '+escHtml(translateSv(s.price_text)) : ''}</div>
         </div>
         <div class="distance">${distStr}</div>
       </div>
@@ -774,29 +918,54 @@ function parseGoogleMapsUrl(text) {
   return null;
 }
 
-// ── Nominatim geocoding ──
+// ── Geocoding (Photon primary, Nominatim fallback) ──
+async function _photonSearch(query, limit = 1) {
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=57.7&lon=12.0&limit=${limit}&lang=en`;
+  const resp = await fetch(url);
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  return (data.features || []).map(f => ({
+    lat: f.geometry.coordinates[1],
+    lon: f.geometry.coordinates[0],
+    display_name: [f.properties.name, f.properties.street, f.properties.city, f.properties.country].filter(Boolean).join(', '),
+    name: f.properties.name || f.properties.street || ''
+  }));
+}
+
+async function _nominatimSearch(query, bounded = true) {
+  const bbox = bounded ? '&viewbox=11.7,57.6,12.2,57.85&bounded=1' : '';
+  const q = bounded ? query : query + ', Gothenburg';
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}${bbox}&limit=5&addressdetails=1`;
+  const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+  if (!resp.ok) return [];
+  return resp.json();
+}
+
 async function geocodeAddress(query) {
   const input = document.getElementById('location-input');
   input.style.borderColor = 'var(--yellow)';
   input.placeholder = 'Searching...';
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&viewbox=11.7,57.6,12.2,57.85&bounded=1&limit=1`;
-    const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-    const results = await resp.json();
+    // Try Photon first (no rate limit)
+    let results = await _photonSearch(query, 1);
     if (results.length > 0) {
-      const r = results[0];
-      setUserLocation(parseFloat(r.lat), parseFloat(r.lon));
+      setUserLocation(results[0].lat, results[0].lon);
       input.value = '';
       input.blur();
       return true;
     }
-    // Retry without bounding box
-    const url2 = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Gothenburg')}&limit=1`;
-    const resp2 = await fetch(url2, { headers: { 'Accept-Language': 'en' } });
-    const results2 = await resp2.json();
-    if (results2.length > 0) {
-      const r = results2[0];
-      setUserLocation(parseFloat(r.lat), parseFloat(r.lon));
+    // Fallback: Nominatim bounded
+    let nomResults = await _nominatimSearch(query, true);
+    if (nomResults.length > 0) {
+      setUserLocation(parseFloat(nomResults[0].lat), parseFloat(nomResults[0].lon));
+      input.value = '';
+      input.blur();
+      return true;
+    }
+    // Fallback: Nominatim unbounded
+    nomResults = await _nominatimSearch(query, false);
+    if (nomResults.length > 0) {
+      setUserLocation(parseFloat(nomResults[0].lat), parseFloat(nomResults[0].lon));
       input.value = '';
       input.blur();
       return true;
@@ -818,10 +987,21 @@ const acEl = document.getElementById('autocomplete');
 function hideAutocomplete() { acEl.classList.remove('visible'); acEl.innerHTML = ''; }
 
 async function fetchSuggestions(q) {
-  // Widen viewbox to include Mölndal, Partille, Kungälv area
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&viewbox=11.6,57.55,12.3,57.9&bounded=0&limit=5&addressdetails=1`;
-  const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-  return resp.json();
+  // Photon primary (no rate limit), Nominatim fallback
+  try {
+    const results = await _photonSearch(q, 5);
+    if (results.length > 0) return results;
+  } catch {}
+  // Fallback to Nominatim
+  try {
+    const nomResults = await _nominatimSearch(q, false);
+    return nomResults.map(r => ({
+      lat: parseFloat(r.lat),
+      lon: parseFloat(r.lon),
+      display_name: r.display_name,
+      name: r.display_name.split(',')[0].trim()
+    }));
+  } catch { return []; }
 }
 
 function showSuggestions(results) {
@@ -836,8 +1016,8 @@ function showSuggestions(results) {
   acEl.querySelectorAll('.ac-item').forEach((el, i) => {
     el.addEventListener('click', () => {
       const r = results[i];
-      setUserLocation(parseFloat(r.lat), parseFloat(r.lon));
-      document.getElementById('location-input').value = results[i].display_name.split(',')[0].trim();
+      setUserLocation(r.lat, r.lon);
+      document.getElementById('location-input').value = r.name || r.display_name.split(',')[0].trim();
       hideAutocomplete();
     });
   });
@@ -924,6 +1104,12 @@ function toggleType(btn) {
   refreshMap();
 }
 
+function toggleHideFree(btn) {
+  hideFree = !hideFree;
+  btn.classList.toggle('active', hideFree);
+  refreshMap();
+}
+
 document.getElementById('sort-select').addEventListener('change', e => {
   sortMode = e.target.value;
   updateRadiusCircle();
@@ -959,34 +1145,42 @@ function updateRadiusCircle() {
 const langBtn = document.getElementById('lang-btn');
 langBtn.addEventListener('click', () => {
   lang = lang === 'sv' ? 'en' : 'sv';
-  langBtn.textContent = lang === 'sv' ? 'SV→EN' : 'EN→SV';
+  langBtn.textContent = lang === 'sv' ? '🇸🇪' : '🇬🇧';
   refreshMap();
 });
 
-// ── Map style toggle (dark / light / satellite) ──
-const styleBtns = document.querySelectorAll('#map-style-toggle button');
-function setMapStyle(style) {
+// ── Theme toggle (dark / light) ──
+const themeBtn = document.getElementById('theme-btn');
+function applyMapLayer() {
   map.removeLayer(activeLayer);
-  styleBtns.forEach(b => b.classList.toggle('active', b.dataset.style === style));
-  if (style === 'light') {
-    currentTheme = 'light';
-    activeLayer = lightLayer;
-    document.documentElement.setAttribute('data-theme', 'light');
-    document.querySelector('meta[name="theme-color"]').content = '#ffffff';
-  } else if (style === 'satellite') {
-    currentTheme = 'satellite';
+  if (isSatellite) {
     activeLayer = satelliteLayer;
-    document.documentElement.removeAttribute('data-theme');
-    document.querySelector('meta[name="theme-color"]').content = '#1a1a2e';
   } else {
-    currentTheme = 'dark';
-    activeLayer = darkLayer;
-    document.documentElement.removeAttribute('data-theme');
-    document.querySelector('meta[name="theme-color"]').content = '#1a1a2e';
+    activeLayer = isDark ? darkLayer : lightLayer;
   }
   activeLayer.addTo(map);
 }
-styleBtns.forEach(btn => btn.addEventListener('click', () => setMapStyle(btn.dataset.style)));
+themeBtn.addEventListener('click', () => {
+  isDark = !isDark;
+  themeBtn.textContent = isDark ? '☀️' : '🌙';
+  if (isDark) {
+    document.documentElement.removeAttribute('data-theme');
+    document.querySelector('meta[name="theme-color"]').content = '#1a1a2e';
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.querySelector('meta[name="theme-color"]').content = '#ffffff';
+  }
+  applyMapLayer();
+});
+
+// ── Satellite toggle ──
+const satBtn = document.getElementById('satellite-btn');
+satBtn.addEventListener('click', () => {
+  isSatellite = !isSatellite;
+  satBtn.classList.toggle('active', isSatellite);
+  satBtn.textContent = isSatellite ? '🗺️' : '🛰️';
+  applyMapLayer();
+});
 
 // ── Drop pin ──
 function enableDropPin() {
