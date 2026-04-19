@@ -22,12 +22,17 @@ def parse_sek_per_hour(text: str) -> float | None:
       X kr/tim, X kr/timme, Xkr/Tim           → X
       X kr/h, Xkr/h                           → X
       0 kr/h (free)                            → 0
+      Gratis / avgiftsfri                      → 0
     """
     if not text:
         return None
     t = text  # keep original case for position matching
     tl = text.lower()
-    
+
+    # Explicit free parking
+    if re.search(r"\bgratis\b|\bavgiftsfri", tl):
+        return 0.0
+
     candidates = []
     
     # "X kr per påbörjade N min" — generic minute-based
@@ -139,6 +144,13 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
         gbg_codes = set()
 
     raw = json.loads(path.read_text())
+
+    # Load API-fetched tariff prices as supplementary source
+    tariff_prices = {}
+    tariff_path = DATA_DIR / "easypark_prices.json"
+    if tariff_path.exists():
+        tariff_prices = json.loads(tariff_path.read_text())
+
     results = []
     for ano, record in raw.items():
         detail = record.get("areaDetail", {})
@@ -159,6 +171,10 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
         price = parse_sek_per_hour(all_text)
         time_limit = parse_time_limit(all_text)
         max_daily = parse_max_daily(all_text)
+
+        # Supplement with API-fetched tariff price if text parsing found nothing
+        if price is None and ano in tariff_prices:
+            price = float(tariff_prices[ano])
         
         # Better price_text: first line of popup, or first meaningful line
         price_display = popup.split("\n")[0].strip() if popup else ""
@@ -314,7 +330,8 @@ def load_parkering_gbg() -> list[dict]:
 
         ptype = a.get("parking_type", "")
         # timeLimited + free = time-limited free parking (duration on sign only)
-        is_time_limited_free = (ptype == "timeLimited" and price is None
+        is_time_limited_free = (ptype == "timeLimited"
+                                and (price is None or price == 0)
                                 and "gratis" in raw_text.lower())
 
         results.append({
