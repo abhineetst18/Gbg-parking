@@ -326,6 +326,18 @@ body {
 [data-theme="dark"] .type-badge.type-ev     { color: #34d399; border-color: #34d399; }
 [data-theme="dark"] .type-badge.type-other  { color: #9ca3af; border-color: #9ca3af; }
 
+/* Seasonal badge */
+.seasonal-badge {
+  display: inline-block; font-size: 9px; font-weight: 600; padding: 1px 5px;
+  border-radius: 6px; letter-spacing: 0.3px; vertical-align: middle;
+  background: transparent; border: 1.5px solid;
+  margin-left: 4px;
+}
+.seasonal-badge.season-active { color: #d97706; border-color: #d97706; }
+.seasonal-badge.season-inactive { color: #6b7280; border-color: #6b7280; }
+[data-theme="dark"] .seasonal-badge.season-active { color: #fbbf24; border-color: #fbbf24; }
+[data-theme="dark"] .seasonal-badge.season-inactive { color: #9ca3af; border-color: #9ca3af; }
+
 /* Popup actions row */
 .popup-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .popup-actions .popup-pill { font-size: 12px; padding: 5px 10px; }
@@ -454,10 +466,10 @@ const SV_EN = [
   // Time expressions (order matters - longer patterns first)
   [/\balla dagar\b/gi, 'all days'],
   [/\bhelgfri\b/gi, 'non-holiday'],
-  [/\bmån-fre\b/gi, 'Mon-Fri'],
+  [/\bmånd?-fred?\b/gi, 'Mon-Fri'],
+  [/\blör-sön\b/gi, 'Sat-Sun'],
   [/\bmån\b/gi, 'Mon'], [/\btis\b/gi, 'Tue'], [/\bons\b/gi, 'Wed'],
   [/\btor\b/gi, 'Thu'], [/\bfre\b/gi, 'Fri'], [/\blör\b/gi, 'Sat'], [/\bsön\b/gi, 'Sun'],
-  [/\blör-sön\b/gi, 'Sat-Sun'],
   [/\bmåndagar\b/gi, 'Mondays'], [/\btisdagar\b/gi, 'Tuesdays'],
   [/\bonsdagar\b/gi, 'Wednesdays'], [/\btorsdagar\b/gi, 'Thursdays'],
   [/\bfredagar\b/gi, 'Fridays'], [/\blördagar\b/gi, 'Saturdays'],
@@ -572,13 +584,62 @@ const SV_EN = [
   [/\bplatsen\b/gi, 'the spot'],
   [/\bplats\b/gi, 'spot'],
   [/\bomgående\b/gi, 'immediately'],
+  [/\bzonkod\b/gi, 'zone code'],
+  [/\bområdeskod\b/gi, 'area code'],
   [/\bzon\b/gi, 'zone'],
   [/\bomr[åa]det\b/gi, 'the area'],
-  [/\bdigitalt?\b/gi, 'digitally'],
+  [/\bdigital\w*\b/gi, 'digital'],
   [/\bundantag\b/gi, 'exception'],
   [/\btillfälligt\b/gi, 'temporarily'],
   [/\bupphör\b/gi, 'expires'],
   [/\bparkering\w*\b/gi, 'parking'],
+  // Common verbs & small words
+  [/\bkan\b/gi, 'can'],
+  [/\bhar\b/gi, 'have'],
+  [/\bär\b/gi, 'is'],
+  [/\bni\b/gi, 'you'],
+  [/\bmed\b/gi, 'with'],
+  [/\bpå\b/gi, 'on'],
+  [/\bvid\b/gi, 'at'],
+  [/\binom\b/gi, 'within'],
+  [/\butan\b/gi, 'without'],
+  [/\bdenna\b/gi, 'this'],
+  [/\bdetta\b/gi, 'this'],
+  [/\bden\b/gi, 'the'],
+  [/\bdet\b/gi, 'the'],
+  [/\bett\b/gi, 'a'],
+  [/\banvända\b/gi, 'use'],
+  [/\bköpas?\b/gi, 'bought'],
+  [/\bbehöver\b/gi, 'need'],
+  [/\bhögsta\b/gi, 'maximum'],
+  [/\blängre\b/gi, 'longer'],
+  [/\blägre\b/gi, 'lower'],
+  [/\bhär\b/gi, 'here'],
+  [/\brätt\b/gi, 'right'],
+  [/\bövrigt\b/gi, 'other'],
+  [/\bbåde\b/gi, 'both'],
+  [/\bgenom\b/gi, 'through'],
+  [/\bhänvisning\b/gi, 'referral'],
+  [/\bförhyrd\w*\b/gi, 'rented'],
+  [/\böppnas?\b/gi, 'open'],
+  [/\bkör\b/gi, 'drive'],
+  [/\bännu\b/gi, 'yet'],
+  // Customer/ticket phrases
+  [/\bkund-?\s*P\b/gi, 'customer P'],
+  [/\bkund\b/gi, 'customer'],
+  [/\bbiljett\w*\b/gi, 'ticket'],
+  [/\bmåndag\b/gi, 'Monday'],
+  [/\btisdag\b/gi, 'Tuesday'],
+  [/\bonsdag\b/gi, 'Wednesday'],
+  [/\btorsdag\b/gi, 'Thursday'],
+  [/\bfredag\b/gi, 'Friday'],
+  [/\blördag\b/gi, 'Saturday'],
+  [/\bsöndag\b/gi, 'Sunday'],
+  [/\bmånad\w*\b/gi, 'monthly'],
+  [/\blångtids?\w*\b/gi, 'long-term'],
+  [/\blåst\w*\b/gi, 'locked'],
+  [/\bP-huse?t?\b/gi, 'the parking garage'],
+  [/\bkl\.\s*/gi, ''],
   // Units
   [/\btim(?:mar|me)?\b/gi, 'hr'],
   [/\bmin\b/gi, 'min'],
@@ -669,6 +730,21 @@ function typeBadge(type) {
   return `<span class="type-badge type-${type}">${icon} ${label}</span>`;
 }
 
+function seasonalBadge(spot) {
+  if (!spot.season_start || !spot.season_end) return '';
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const today = `${mm}-${dd}`;
+  const active = today >= spot.season_start && today <= spot.season_end;
+  const cls = active ? 'season-active' : 'season-inactive';
+  const icon = active ? '☀️' : '❄️';
+  const startParts = spot.season_start.split('-');
+  const endParts = spot.season_end.split('-');
+  const label = `${icon} ${parseInt(startParts[1])}/${parseInt(startParts[0])}-${parseInt(endParts[1])}/${parseInt(endParts[0])}`;
+  return `<span class="seasonal-badge ${cls}">${label}</span>`;
+}
+
 // ── Haversine ──
 function haversine(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -731,7 +807,7 @@ function makeMarker(spot) {
     <div class="popup-price">${priceStr}${maxDailyStr}</div>
     ${codeHtml}
     <div class="popup-meta">
-      ${srcSummary} ${typeBadge(spot.type)}${limitStr}<br>
+      ${srcSummary} ${typeBadge(spot.type)}${seasonalBadge(spot)}${limitStr}<br>
       ${escHtml(translateSv(spot.price_text))}${distStr}
     </div>
     <div class="popup-actions">
@@ -869,7 +945,7 @@ function refreshMap() {
         <div class="price-badge ${priceClass(s.price_sek_hr)}">${priceStr}<br>${priceUnit}</div>
         <div class="info">
           <div class="name">${escHtml(s.name)}${limitBadge}${codeBadge}</div>
-          <div class="meta">${srcLogos} ${typeBadge(s.type)}${s.price_text ? ' · '+escHtml(translateSv(s.price_text)) : ''}</div>
+          <div class="meta">${srcLogos} ${typeBadge(s.type)}${seasonalBadge(s)}${s.price_text ? ' · '+escHtml(translateSv(s.price_text)) : ''}</div>
         </div>
         <div class="distance">${distStr}</div>
       </div>

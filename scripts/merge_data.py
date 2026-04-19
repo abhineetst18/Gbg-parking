@@ -10,6 +10,24 @@ from pathlib import Path
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
+# Manual corrections for P.GBG spots with wrong/missing pricing.
+# Key: spot name (lowercase) substring match at coords.
+# Verified via Google Street View showing P.GBG sign with code.
+PGBG_CORRECTIONS = [
+    {
+        # Gärdesvägen near Hovås: street sign shows code 4890 (Askims Simhall zone)
+        # P.GBG data wrongly says "Gratis" for these street segments
+        "name_match": "gärdesvägen",
+        "lat_range": (57.615, 57.625),
+        "lon_range": (11.935, 11.945),
+        "override": {
+            "price_sek_hr": 7.0,
+            "price_text": "7 kr/tim alla dagar 08-22, övrig tid 2 kr/tim",
+            "area_code": "4890",
+        },
+    },
+]
+
 
 def parse_sek_per_hour(text: str) -> float | None:
     """Extract SEK/hour from Swedish pricing text. Picks the primary (first/daytime) rate.
@@ -84,6 +102,24 @@ def parse_max_daily(text: str) -> float | None:
     m = re.search(r"(\d+)\s*kr\s+24\s*-?\s*tim", tl)
     if m:
         return float(m.group(1))
+    return None
+
+
+def parse_season(text: str) -> tuple[str, str] | None:
+    """Extract seasonal date range from text like 'Avgift 1/5-30/9' or 'Avgift 1/6 till 30/9'.
+    
+    Returns (start, end) as 'MM-DD' strings, or None if not seasonal.
+    """
+    if not text:
+        return None
+    tl = text.lower()
+    # Pattern: "avgift D/M-D/M" or "avgift D/M till D/M"
+    m = re.search(r"avgift\s+(\d{1,2})/(\d{1,2})\s*[-–]\s*(\d{1,2})/(\d{1,2})", tl)
+    if not m:
+        m = re.search(r"avgift\s+(\d{1,2})/(\d{1,2})\s+till\s+(\d{1,2})/(\d{1,2})", tl)
+    if m:
+        sd, sm, ed, em = m.group(1), m.group(2), m.group(3), m.group(4)
+        return (f"{int(sm):02d}-{int(sd):02d}", f"{int(em):02d}-{int(ed):02d}")
     return None
 
 
@@ -180,6 +216,7 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
         price = parse_sek_per_hour(all_text)
         time_limit = parse_time_limit(all_text)
         max_daily = parse_max_daily(all_text)
+        season = parse_season(all_text)
 
         # Supplement with API-fetched tariff price if text parsing found nothing
         if price is None and ano in tariff_prices:
@@ -211,6 +248,8 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
             "price_text": price_display,
             "time_limit": time_limit,
             "max_daily_sek": max_daily,
+            "season_start": season[0] if season else None,
+            "season_end": season[1] if season else None,
             "area_code": area_code,
             "gbg_code": gbg_code,
             "type": classify_type(custom_type or area_type),
@@ -286,6 +325,8 @@ def load_parkster() -> list[dict]:
             "price_text": price_text,
             "time_limit": None,
             "max_daily_sek": None,
+            "season_start": None,
+            "season_end": None,
             "area_code": str(z.get("zoneCode", "")),
             "type": "street",  # Parkster is primarily street parking
             "source": "parkster",
@@ -337,6 +378,7 @@ def load_parkering_gbg() -> list[dict]:
         price = parse_sek_per_hour(raw_text) if raw_text else None
         time_limit = parse_time_limit(raw_text) if raw_text else None
         max_daily = parse_max_daily(raw_text) if raw_text else None
+        season = parse_season(raw_text) if raw_text else None
 
         ptype = a.get("parking_type", "")
         # timeLimited + free = time-limited free parking (duration on sign only)
@@ -354,6 +396,8 @@ def load_parkering_gbg() -> list[dict]:
             "time_limit": time_limit,
             "time_limited_free": is_time_limited_free,
             "max_daily_sek": max_daily,
+            "season_start": season[0] if season else None,
+            "season_end": season[1] if season else None,
             "area_code": str(a.get("parking_code", "") or ""),
             "type": classify_type(ptype),
             "source": "parkering_gbg",
@@ -364,6 +408,19 @@ def load_parkering_gbg() -> list[dict]:
             "free_spaces": a.get("free_spaces"),
             "has_charging": a.get("has_charging", False),
         })
+
+    # Apply manual corrections for known data errors
+    corrections_applied = 0
+    for spot in results:
+        for corr in PGBG_CORRECTIONS:
+            if (corr["name_match"] in spot["name"].lower()
+                    and corr["lat_range"][0] <= spot["lat"] <= corr["lat_range"][1]
+                    and corr["lon_range"][0] <= spot["lon"] <= corr["lon_range"][1]):
+                spot.update(corr["override"])
+                corrections_applied += 1
+    if corrections_applied:
+        print(f"  Applied {corrections_applied} manual corrections")
+
     return results
 
 
@@ -496,6 +553,7 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
         price = parse_sek_per_hour(raw_text)
         time_limit = parse_time_limit(raw_text)
         max_daily = parse_max_daily(raw_text)
+        season = parse_season(raw_text)
 
         price_display = str(desc[0])[:100] if desc and desc[0] else ""
 
@@ -511,6 +569,8 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
             "price_text": price_display,
             "time_limit": time_limit,
             "max_daily_sek": max_daily,
+            "season_start": season[0] if season else None,
+            "season_end": season[1] if season else None,
             "area_code": code,
             "type": "ev" if has_ev else "street",
             "source": "epark",
@@ -629,6 +689,8 @@ def _merge_group(group: list[dict]) -> dict:
         "time_limit": time_limit,
         "time_limited_free": tlf,
         "max_daily_sek": max_daily,
+        "season_start": next((s.get("season_start") for s in group if s.get("season_start")), None),
+        "season_end": next((s.get("season_end") for s in group if s.get("season_end")), None),
         "area_codes": area_codes,
         "sources": sources,
         "type": best_type,
@@ -763,6 +825,8 @@ def deduplicate(spots: list[dict]) -> list[dict]:
                 "time_limit": s.get("time_limit"),
                 "time_limited_free": s.get("time_limited_free", False),
                 "max_daily_sek": s.get("max_daily_sek"),
+                "season_start": s.get("season_start"),
+                "season_end": s.get("season_end"),
                 "area_codes": {s["source"]: s["area_code"]} if s.get("area_code") else {},
                 "sources": [s["source"]],
                 "type": s["type"],
