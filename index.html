@@ -782,6 +782,9 @@ function makeMarker(spot) {
   }
   const limitStr = spot.time_limit ? `<br>⏱ Max ${spot.time_limit}` : (spot.time_limited_free ? '<br>⏱ Check sign for time limit' : '');
   const maxDailyStr = spot.max_daily_sek ? ` · Max ${spot.max_daily_sek} SEK/day` : '';
+  const freeMinStr = spot.free_minutes ? `<br>🆓 First ${spot.free_minutes >= 60 ? (spot.free_minutes/60)+'h' : spot.free_minutes+'min'} free` : '';
+  const permitStr = spot.permit_required ? '<br>🪪 Permit required (some hours)' : '';
+  const svcFeeStr = spot.service_fee ? '<br>💳 Service fee may apply' : '';
   const distStr = spot._dist != null ? `<br>${formatDist(spot._dist)} away` : '';
   const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lon}&travelmode=walking`;
   const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${spot.lat},${spot.lon}`;
@@ -807,7 +810,7 @@ function makeMarker(spot) {
     <div class="popup-price">${priceStr}${maxDailyStr}</div>
     ${codeHtml}
     <div class="popup-meta">
-      ${srcSummary} ${typeBadge(spot.type)}${seasonalBadge(spot)}${limitStr}<br>
+      ${srcSummary} ${typeBadge(spot.type)}${seasonalBadge(spot)}${limitStr}${freeMinStr}${permitStr}${svcFeeStr}<br>
       ${escHtml(translateSv(spot.price_text))}${distStr}
     </div>
     <div class="popup-actions">
@@ -936,6 +939,8 @@ function refreshMap() {
     const distStr = s._dist != null ? formatDist(s._dist) : '';
     let limitBadge = s.time_limit ? `<span style="color:var(--yellow);font-size:10px"> ⏱${s.time_limit}</span>` : '';
     if (!limitBadge && s.time_limited_free) limitBadge = '<span style="color:var(--yellow);font-size:10px"> ⏱ check sign</span>';
+    const freeBadge = s.free_minutes ? `<span style="color:var(--green);font-size:10px"> 🆓${s.free_minutes >= 60 ? (s.free_minutes/60)+'h' : s.free_minutes+'min'}</span>` : '';
+    const permitBadge = s.permit_required ? '<span style="color:var(--text-dim);font-size:10px"> 🪪</span>' : '';
     const codes = s.area_codes || {};
     const firstCode = Object.values(codes)[0] || '';
     const codeBadge = firstCode ? `<span style="color:var(--text-dim);font-size:10px;font-family:monospace"> #${escHtml(firstCode)}</span>` : '';
@@ -944,7 +949,7 @@ function refreshMap() {
       <div class="result-card" onclick="flyTo(${s.lat},${s.lon},'${s.id}')">
         <div class="price-badge ${priceClass(s.price_sek_hr)}">${priceStr}<br>${priceUnit}</div>
         <div class="info">
-          <div class="name">${escHtml(s.name)}${limitBadge}${codeBadge}</div>
+          <div class="name">${escHtml(s.name)}${limitBadge}${freeBadge}${permitBadge}${codeBadge}</div>
           <div class="meta">${srcLogos} ${typeBadge(s.type)}${seasonalBadge(s)}${s.price_text ? ' · '+escHtml(translateSv(s.price_text)) : ''}</div>
         </div>
         <div class="distance">${distStr}</div>

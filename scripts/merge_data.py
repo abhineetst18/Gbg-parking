@@ -124,9 +124,25 @@ def parse_season(text: str) -> tuple[str, str] | None:
 
 
 def parse_time_limit(text: str) -> str | None:
-    """Extract parking time limit from Swedish text. Returns e.g. '24h', '2h', '10min'."""
+    """Extract parking time limit from Swedish text. Returns e.g. '7d', '24h', '2h', '10min'."""
     if not text:
         return None
+    tl = text.lower()
+    # "Maxtid X dagar" or "Maxtid X dag"
+    m = re.search(r"maxtid\s+(\d+)\s*dag", tl)
+    if m:
+        return f"{m.group(1)}d"
+    # "Max p-tid X dagar/dygn/tim/min"
+    m = re.search(r"max\s*p-tid\s*(\d+)\s*(dag|dygn|tim|min)", tl)
+    if m:
+        val, unit = m.group(1), m.group(2)
+        if 'dag' in unit or 'dygn' in unit:
+            return f"{val}d"
+        return f"{val}h" if 'tim' in unit else f"{val}min"
+    # "Maxtid X tim" (hours, not days)
+    m = re.search(r"maxtid\s+(\d+)\s*tim", tl)
+    if m:
+        return f"{m.group(1)}h"
     # "24 tim" or "2 timmar" (time limit, not price)
     m = re.search(r"(\d+)\s*tim(?:mar|me)?\b(?!\s*/?\s*kr)", text)
     if m:
@@ -139,11 +155,33 @@ def parse_time_limit(text: str) -> str | None:
     m = re.search(r"tidsbegräns\w*\s*(?:parkering\w*)?\s*(\d+)\s*min", text)
     if m:
         return f"{m.group(1)}min"
-    # "Max P-tid 30 min" or "Max P-tid 2 tim"
-    m = re.search(r"max\s*p-tid\s*(\d+)\s*(tim|min)", text.lower())
+    return None
+
+
+def parse_free_minutes(text: str) -> int | None:
+    """Extract initial free parking period from text like 'Fri parkering 2 tim' or '1 timma fri'.
+    
+    Returns the free period in minutes, or None if no free period.
+    """
+    if not text:
+        return None
+    tl = text.lower()
+    # "Fri parkering X tim" or "Fritt X tim"
+    m = re.search(r"fri\w*\s+(?:parkering\s+)?(\d+(?:[.,]\d+)?)\s*(?:tim|h)\b", tl)
     if m:
-        val, unit = m.group(1), m.group(2)
-        return f"{val}h" if 'tim' in unit else f"{val}min"
+        return int(float(m.group(1).replace(",", ".")) * 60)
+    # "X tim fri parkering" or "X timma fri"
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:tim\w*|h)\s+fri", tl)
+    if m:
+        return int(float(m.group(1).replace(",", ".")) * 60)
+    # "Fri parkering X min"
+    m = re.search(r"fri\w*\s+(?:parkering\s+)?(\d+)\s*min", tl)
+    if m:
+        return int(m.group(1))
+    # "X min fri"
+    m = re.search(r"(\d+)\s*min\s+fri", tl)
+    if m:
+        return int(m.group(1))
     return None
 
 
@@ -217,6 +255,10 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
         time_limit = parse_time_limit(all_text)
         max_daily = parse_max_daily(all_text)
         season = parse_season(all_text)
+        free_mins = parse_free_minutes(all_text)
+        all_lower = all_text.lower()
+        permit_req = bool(re.search(r"p-tillstånd|tillstånd\s+(?:erfordras|gäller|krävs)", all_lower))
+        has_svc_fee = "serviceavgift" in all_lower
 
         # Supplement with API-fetched tariff price if text parsing found nothing
         if price is None and ano in tariff_prices:
@@ -250,6 +292,9 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
             "max_daily_sek": max_daily,
             "season_start": season[0] if season else None,
             "season_end": season[1] if season else None,
+            "free_minutes": free_mins,
+            "permit_required": permit_req,
+            "service_fee": has_svc_fee,
             "area_code": area_code,
             "gbg_code": gbg_code,
             "type": classify_type(custom_type or area_type),
@@ -327,6 +372,9 @@ def load_parkster() -> list[dict]:
             "max_daily_sek": None,
             "season_start": None,
             "season_end": None,
+            "free_minutes": None,
+            "permit_required": False,
+            "service_fee": False,
             "area_code": str(z.get("zoneCode", "")),
             "type": "street",  # Parkster is primarily street parking
             "source": "parkster",
@@ -379,6 +427,10 @@ def load_parkering_gbg() -> list[dict]:
         time_limit = parse_time_limit(raw_text) if raw_text else None
         max_daily = parse_max_daily(raw_text) if raw_text else None
         season = parse_season(raw_text) if raw_text else None
+        free_mins = parse_free_minutes(raw_text) if raw_text else None
+        raw_lower = raw_text.lower()
+        permit_req = bool(re.search(r"p-tillstånd|tillstånd\s+(?:erfordras|gäller|krävs)", raw_lower))
+        has_svc_fee = "serviceavgift" in raw_lower
 
         ptype = a.get("parking_type", "")
         # timeLimited + free = time-limited free parking (duration on sign only)
@@ -398,6 +450,9 @@ def load_parkering_gbg() -> list[dict]:
             "max_daily_sek": max_daily,
             "season_start": season[0] if season else None,
             "season_end": season[1] if season else None,
+            "free_minutes": free_mins,
+            "permit_required": permit_req,
+            "service_fee": has_svc_fee,
             "area_code": str(a.get("parking_code", "") or ""),
             "type": classify_type(ptype),
             "source": "parkering_gbg",
@@ -554,6 +609,10 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
         time_limit = parse_time_limit(raw_text)
         max_daily = parse_max_daily(raw_text)
         season = parse_season(raw_text)
+        free_mins = parse_free_minutes(raw_text)
+        raw_lower = raw_text.lower()
+        permit_req = bool(re.search(r"p-tillstånd|tillstånd\s+(?:erfordras|gäller|krävs)", raw_lower))
+        has_svc_fee = "serviceavgift" in raw_lower
 
         price_display = str(desc[0])[:100] if desc and desc[0] else ""
 
@@ -571,6 +630,9 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
             "max_daily_sek": max_daily,
             "season_start": season[0] if season else None,
             "season_end": season[1] if season else None,
+            "free_minutes": free_mins,
+            "permit_required": permit_req,
+            "service_fee": has_svc_fee,
             "area_code": code,
             "type": "ev" if has_ev else "street",
             "source": "epark",
@@ -691,6 +753,9 @@ def _merge_group(group: list[dict]) -> dict:
         "max_daily_sek": max_daily,
         "season_start": next((s.get("season_start") for s in group if s.get("season_start")), None),
         "season_end": next((s.get("season_end") for s in group if s.get("season_end")), None),
+        "free_minutes": next((s.get("free_minutes") for s in group if s.get("free_minutes")), None),
+        "permit_required": any(s.get("permit_required") for s in group),
+        "service_fee": any(s.get("service_fee") for s in group),
         "area_codes": area_codes,
         "sources": sources,
         "type": best_type,
@@ -827,6 +892,9 @@ def deduplicate(spots: list[dict]) -> list[dict]:
                 "max_daily_sek": s.get("max_daily_sek"),
                 "season_start": s.get("season_start"),
                 "season_end": s.get("season_end"),
+                "free_minutes": s.get("free_minutes"),
+                "permit_required": s.get("permit_required", False),
+                "service_fee": s.get("service_fee", False),
                 "area_codes": {s["source"]: s["area_code"]} if s.get("area_code") else {},
                 "sources": [s["source"]],
                 "type": s["type"],
