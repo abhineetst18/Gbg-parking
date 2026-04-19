@@ -1,4 +1,4 @@
-const CACHE_NAME = 'parking-gbg-v14';
+const CACHE_NAME = 'parking-gbg-v15';
 const ASSETS = [
   './',
   './index.html',
@@ -27,8 +27,10 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Network first for data, cache first for assets
-  if (event.request.url.includes('parking_data.json')) {
+  const url = event.request.url;
+
+  // Network-first for parking data
+  if (url.includes('parking_data.json')) {
     event.respondWith(
       fetch(event.request)
         .then(resp => {
@@ -38,8 +40,11 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => caches.match(event.request))
     );
-  } else if (event.request.url.includes('basemaps.cartocdn.com')) {
-    // Cache map tiles
+    return;
+  }
+
+  // Cache map tiles (CartoDB + Esri satellite)
+  if (url.includes('basemaps.cartocdn.com') || url.includes('arcgisonline.com')) {
     event.respondWith(
       caches.match(event.request).then(cached =>
         cached || fetch(event.request).then(resp => {
@@ -49,9 +54,16 @@ self.addEventListener('fetch', event => {
         })
       )
     );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then(cached => cached || fetch(event.request))
-    );
+    return;
   }
+
+  // Let external API calls (Nominatim search, etc.) bypass SW entirely
+  if (!url.startsWith(self.location.origin) && !url.includes('unpkg.com')) {
+    return;
+  }
+
+  // Same-origin assets + CDN libs: cache-first
+  event.respondWith(
+    caches.match(event.request).then(cached => cached || fetch(event.request))
+  );
 });

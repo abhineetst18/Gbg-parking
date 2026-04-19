@@ -62,6 +62,11 @@ body {
 #header .stats { font-size: 11px; color: var(--text-dim); margin-left: auto; white-space: nowrap; }
 #lang-btn, #theme-btn { flex-shrink: 0; background: none; border: none; font-size: 12px; cursor: pointer; padding: 4px 6px; line-height: 1; color: var(--text-dim); font-weight: 600; }
 #lang-btn:hover { color: var(--text); }
+#map-style-toggle { flex-shrink: 0; display: flex; gap: 2px; background: rgba(255,255,255,0.08); border-radius: 8px; padding: 2px; }
+#map-style-toggle button { background: none; border: none; font-size: 11px; cursor: pointer; padding: 3px 6px; border-radius: 6px; color: var(--text-dim); line-height: 1; }
+#map-style-toggle button.active { background: var(--surface2); color: var(--text); }
+[data-theme="light"] #map-style-toggle { background: rgba(0,0,0,0.06); }
+[data-theme="light"] #map-style-toggle button.active { background: #d0d2d6; }
 
 /* Map */
 #map {
@@ -330,7 +335,11 @@ body {
   <a class="author" href="https://github.com/abhineetst18" target="_blank" rel="noopener">by Abhineet</a>
   <span id="stats" class="stats"></span>
   <button id="lang-btn" title="Toggle language">SV→EN</button>
-  <button id="theme-btn" title="Toggle theme">🌙</button>
+  <div id="map-style-toggle">
+    <button data-style="dark" class="active" title="Dark map">🌙</button>
+    <button data-style="light" title="Light map">☀️</button>
+    <button data-style="satellite" title="Satellite">🛰️</button>
+  </div>
 </div>
 
 <div id="map"></div>
@@ -954,31 +963,30 @@ langBtn.addEventListener('click', () => {
   refreshMap();
 });
 
-// ── Theme toggle (dark → light → satellite → dark) ──
-const themeBtn = document.getElementById('theme-btn');
-themeBtn.addEventListener('click', () => {
+// ── Map style toggle (dark / light / satellite) ──
+const styleBtns = document.querySelectorAll('#map-style-toggle button');
+function setMapStyle(style) {
   map.removeLayer(activeLayer);
-  if (currentTheme === 'dark') {
+  styleBtns.forEach(b => b.classList.toggle('active', b.dataset.style === style));
+  if (style === 'light') {
     currentTheme = 'light';
     activeLayer = lightLayer;
     document.documentElement.setAttribute('data-theme', 'light');
     document.querySelector('meta[name="theme-color"]').content = '#ffffff';
-    themeBtn.textContent = '☀️';
-  } else if (currentTheme === 'light') {
+  } else if (style === 'satellite') {
     currentTheme = 'satellite';
     activeLayer = satelliteLayer;
     document.documentElement.removeAttribute('data-theme');
     document.querySelector('meta[name="theme-color"]').content = '#1a1a2e';
-    themeBtn.textContent = '🛰️';
   } else {
     currentTheme = 'dark';
     activeLayer = darkLayer;
     document.documentElement.removeAttribute('data-theme');
     document.querySelector('meta[name="theme-color"]').content = '#1a1a2e';
-    themeBtn.textContent = '🌙';
   }
   activeLayer.addTo(map);
-});
+}
+styleBtns.forEach(btn => btn.addEventListener('click', () => setMapStyle(btn.dataset.style)));
 
 // ── Drop pin ──
 function enableDropPin() {
