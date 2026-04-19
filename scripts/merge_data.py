@@ -1,6 +1,7 @@
 """Merge all parking data sources into a unified JSON for the web app."""
 
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -401,11 +402,19 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
             seen.add(key)
             unique_zones.append(z)
 
-    # Geocode cache for ePARK-exclusive zones
-    geocode_cache = {}
+    # Geocode cache for ePARK-exclusive zones (persistent file cache)
+    cache_path = DATA_DIR / "epark_geocode_cache.json"
+    if cache_path.exists():
+        geocode_cache = json.loads(cache_path.read_text())
+        # Convert stored lists back to tuples, keep None as None
+        geocode_cache = {k: tuple(v) if v else None for k, v in geocode_cache.items()}
+    else:
+        geocode_cache = {}
+    cache_dirty = False
 
     def geocode_street(street_name: str) -> tuple[float, float] | None:
         """Geocode a street name in Göteborg via Nominatim."""
+        nonlocal cache_dirty
         if street_name in geocode_cache:
             return geocode_cache[street_name]
         for attempt in range(3):
@@ -424,16 +433,21 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
                     lat = float(results[0]["lat"])
                     lon = float(results[0]["lon"])
                     geocode_cache[street_name] = (lat, lon)
+                    cache_dirty = True
                     return (lat, lon)
                 break  # got valid response with no results
             except Exception:
                 time.sleep(2)
         geocode_cache[street_name] = None
+        cache_dirty = True
         return None
 
     results = []
     geocoded_count = 0
     skipped_no_coords = 0
+    skip_geocode = os.environ.get("SKIP_GEOCODE", "").strip() == "1"
+    if skip_geocode:
+        print("  SKIP_GEOCODE=1: skipping Nominatim geocoding for unmatched zones")
 
     for z in unique_zones:
         zid = z.get("id")
@@ -444,12 +458,23 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
         lat, lon = None, None
         if code in gbg_coord_map:
             lat, lon = gbg_coord_map[code]
-        else:
-            # Geocode using street name
+        elif title in geocode_cache and geocode_cache[title] is not None:
+            # Use persistent cache (no network needed)
+            lat, lon = geocode_cache[title]
+        elif not skip_geocode:
+            # Geocode using street name via Nominatim
             coords = geocode_street(title)
             if coords:
                 lat, lon = coords
                 geocoded_count += 1
+                # Save cache periodically to preserve progress
+                if cache_dirty and geocoded_count % 50 == 0:
+                    cache_path.write_text(json.dumps(
+                        {k: list(v) if v else None for k, v in geocode_cache.items()},
+                        indent=1,
+                    ))
+                    cache_dirty = False
+                    print(f"  ... geocoded {geocoded_count} so far (cache saved)")
                 time.sleep(1.1)  # Nominatim rate limit: 1 req/sec
 
         if not lat or not lon:
@@ -484,6 +509,15 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
             "area_type_raw": "",
             "status": "ACTIVE",
         })
+
+    # Persist geocode cache to disk
+    if cache_dirty:
+        # Convert tuples to lists for JSON serialization
+        cache_path.write_text(json.dumps(
+            {k: list(v) if v else None for k, v in geocode_cache.items()},
+            indent=1,
+        ))
+        print(f"  Saved geocode cache ({len(geocode_cache)} entries)")
 
     if geocoded_count:
         print(f"  Geocoded {geocoded_count} ePARK-exclusive zones via Nominatim")
@@ -526,9 +560,16 @@ def _merge_group(group: list[dict]) -> dict:
         if s.get("gbg_code"):
             area_codes.setdefault("parkering_gbg", s["gbg_code"])
 
-    # Best price: prefer the one with actual price, pick lowest
+    # Best price: prefer lowest non-zero price (0 often means permit-only free
+    # zone merged with a nearby paid zone). Only use 0 if ALL sources are free.
     priced = [s for s in group if s["price_sek_hr"] is not None]
-    best_price = min(priced, key=lambda s: s["price_sek_hr"]) if priced else primary
+    paid = [s for s in priced if s["price_sek_hr"] > 0]
+    if paid:
+        best_price = min(paid, key=lambda s: s["price_sek_hr"])
+    elif priced:
+        best_price = priced[0]  # all are 0
+    else:
+        best_price = primary
     
     # Best price text: prefer longest (most detailed)
     best_text = max(group, key=lambda s: len(s.get("price_text") or ""))
