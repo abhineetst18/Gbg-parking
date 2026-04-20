@@ -146,6 +146,36 @@ body {
 }
 [data-theme="light"] #sort-select { border-color: rgba(0,0,0,0.1); }
 
+/* Filter dropdown */
+.filter-dropdown { position: relative; }
+.filter-panel {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  z-index: 1000;
+  min-width: 220px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.filter-panel.open { display: block; }
+.filter-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+  margin: 8px 0 4px;
+  padding: 0 2px;
+}
+.filter-section-label:first-child { margin-top: 0; }
+.filter-group { display: flex; flex-wrap: wrap; gap: 4px; }
+#filter-toggle.has-custom { border-color: var(--accent); color: var(--accent); }
+[data-theme="light"] .filter-panel { border-color: rgba(0,0,0,0.1); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+
 /* Results list */
 #results {
   overflow-y: auto;
@@ -420,17 +450,31 @@ body {
       <option value="price">Cheapest</option>
     </select>
     <button class="btn" onclick="enableDropPin()" title="Drop a pin on the map">📌 Drop Pin</button>
-    <button class="btn filter-btn" data-source="all" onclick="toggleSource(this)">All</button>
-    <button class="btn filter-btn active" data-source="easypark" onclick="toggleSource(this)">EP</button>
-    <button class="btn filter-btn active" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
-    <button class="btn filter-btn active" data-source="parkering_gbg" onclick="toggleSource(this)">GBG</button>
-    <button class="btn filter-btn active" data-source="epark" onclick="toggleSource(this)">ePARK</button>
-    <button class="btn filter-btn active" data-type="street" onclick="toggleType(this)">🛣️ Street</button>
-    <button class="btn filter-btn active" data-type="garage" onclick="toggleType(this)">🏢 Garage</button>
-    <button class="btn filter-btn active" data-type="lot" onclick="toggleType(this)">🅿️ Lot</button>
-    <button class="btn filter-btn" data-type="ev" onclick="toggleType(this)">⚡ EV</button>
-    <button class="btn filter-btn active" data-type="other" onclick="toggleType(this)">Other</button>
-    <button class="btn filter-btn" id="hide-free-btn" onclick="toggleHideFree(this)">🚫 Free</button>
+    <div class="filter-dropdown">
+      <button class="btn" id="filter-toggle" onclick="toggleFilterPanel()">⚙️ Filters</button>
+      <div class="filter-panel" id="filter-panel">
+        <div class="filter-section-label">Sources</div>
+        <div class="filter-group">
+          <button class="btn filter-btn" data-source="all" onclick="toggleSource(this)">All</button>
+          <button class="btn filter-btn active" data-source="easypark" onclick="toggleSource(this)">EP</button>
+          <button class="btn filter-btn active" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
+          <button class="btn filter-btn active" data-source="parkering_gbg" onclick="toggleSource(this)">GBG</button>
+          <button class="btn filter-btn active" data-source="epark" onclick="toggleSource(this)">ePARK</button>
+        </div>
+        <div class="filter-section-label">Type</div>
+        <div class="filter-group">
+          <button class="btn filter-btn active" data-type="street" onclick="toggleType(this)">🛣️ Street</button>
+          <button class="btn filter-btn active" data-type="garage" onclick="toggleType(this)">🏢 Garage</button>
+          <button class="btn filter-btn active" data-type="lot" onclick="toggleType(this)">🅿️ Lot</button>
+          <button class="btn filter-btn" data-type="ev" onclick="toggleType(this)">⚡ EV</button>
+          <button class="btn filter-btn active" data-type="other" onclick="toggleType(this)">Other</button>
+        </div>
+        <div class="filter-section-label">Display</div>
+        <div class="filter-group">
+          <button class="btn filter-btn" id="hide-free-btn" onclick="toggleHideFree(this)">🚫 Hide Free</button>
+        </div>
+      </div>
+    </div>
   </div>
   <div id="radius-row">
     <span>Radius:</span>
@@ -1166,6 +1210,29 @@ document.getElementById('location-input').addEventListener('keydown', async e =>
 });
 
 // ── Filters ──
+function toggleFilterPanel() {
+  const panel = document.getElementById('filter-panel');
+  panel.classList.toggle('open');
+}
+// Close filter panel when clicking outside
+document.addEventListener('click', e => {
+  const dd = document.querySelector('.filter-dropdown');
+  if (dd && !dd.contains(e.target)) {
+    document.getElementById('filter-panel').classList.remove('open');
+  }
+});
+function updateFilterToggleState() {
+  const btn = document.getElementById('filter-toggle');
+  const defaultSources = new Set(['easypark','parkster','parkering_gbg','epark']);
+  const defaultTypes = new Set(['street','garage','lot','other']);
+  const isCustom = hideFree ||
+    activeSources.size !== defaultSources.size || [...activeSources].some(s => !defaultSources.has(s)) ||
+    activeTypes.size !== defaultTypes.size || [...activeTypes].some(t => !defaultTypes.has(t));
+  btn.classList.toggle('has-custom', isCustom);
+  const count = (4 - activeSources.size) + (4 - activeTypes.size) + (hideFree ? 1 : 0);
+  btn.textContent = count > 0 ? `⚙️ Filters (${count})` : '⚙️ Filters';
+}
+
 function toggleSource(btn) {
   const src = btn.dataset.source;
   if (src === 'all') {
@@ -1182,6 +1249,7 @@ function toggleSource(btn) {
     if (btn.classList.contains('active')) activeSources.add(src);
     else activeSources.delete(src);
   }
+  updateFilterToggleState();
   refreshMap();
 }
 
@@ -1190,12 +1258,14 @@ function toggleType(btn) {
   btn.classList.toggle('active');
   if (btn.classList.contains('active')) activeTypes.add(type);
   else activeTypes.delete(type);
+  updateFilterToggleState();
   refreshMap();
 }
 
 function toggleHideFree(btn) {
   hideFree = !hideFree;
   btn.classList.toggle('active', hideFree);
+  updateFilterToggleState();
   refreshMap();
 }
 
