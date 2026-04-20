@@ -468,16 +468,12 @@ body {
     <div class="filter-dropdown" id="filter-dropdown">
       <button class="btn" id="filter-toggle" onclick="togglePanel('filter-panel')">⚙️ Filters</button>
       <div class="filter-panel" id="filter-panel">
-        <div class="filter-section-label">Type</div>
         <div class="filter-group">
           <button class="btn filter-btn active" data-type="street" onclick="toggleType(this)">🛣️ Street</button>
           <button class="btn filter-btn active" data-type="garage" onclick="toggleType(this)">🏢 Garage</button>
           <button class="btn filter-btn active" data-type="lot" onclick="toggleType(this)">🅿️ Lot</button>
           <button class="btn filter-btn" data-type="ev" onclick="toggleType(this)">⚡ EV</button>
           <button class="btn filter-btn active" data-type="other" onclick="toggleType(this)">Other</button>
-        </div>
-        <div class="filter-section-label">Display</div>
-        <div class="filter-group">
           <button class="btn filter-btn" id="hide-free-btn" onclick="toggleHideFree(this)">🚫 Hide Free</button>
         </div>
       </div>
