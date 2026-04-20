@@ -444,6 +444,7 @@ body {
   <div id="panel-header"><div class="handle"></div></div>
   <div id="controls">
     <button class="btn locate" onclick="locateMe()">📍 My Location</button>
+    <button class="btn" onclick="enableDropPin()" title="Drop a pin on the map">📌 Drop Pin</button>
     <div style="position:relative">
       <input id="location-input" type="text" placeholder="Search address or place..." autocomplete="off">
       <div id="autocomplete"></div>
@@ -452,7 +453,6 @@ body {
       <option value="distance">Nearest</option>
       <option value="price">Cheapest</option>
     </select>
-    <button class="btn" onclick="enableDropPin()" title="Drop a pin on the map">📌 Drop Pin</button>
     <div class="filter-dropdown" id="apps-dropdown">
       <button class="btn" id="apps-toggle" onclick="togglePanel('apps-panel')">📱 Apps</button>
       <div class="filter-panel" id="apps-panel">
