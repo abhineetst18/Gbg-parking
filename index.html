@@ -66,7 +66,6 @@ body {
 #header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
 #header .author { font-size: 10px; color: var(--text-dim); text-decoration: none; opacity: 0.6; }
 #header .author:hover { opacity: 1; }
-#header .stats { font-size: 11px; color: var(--text-dim); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .hdr-btn { flex-shrink: 0; background: none; border: 1px solid rgba(255,255,255,0.1); font-size: 14px; cursor: pointer; padding: 3px 7px; border-radius: 8px; line-height: 1; color: var(--text-dim); transition: all 0.15s; }
 .hdr-btn:hover { color: var(--text); background: rgba(255,255,255,0.06); }
 .hdr-btn:active { transform: scale(0.92); }
@@ -173,6 +172,10 @@ body {
 }
 .filter-section-label:first-child { margin-top: 0; }
 .filter-group { display: flex; flex-wrap: wrap; gap: 4px; }
+.src-filter.active[data-source="easypark"] { background: #ec5fa1; border-color: #ec5fa1; color: #fff; }
+.src-filter.active[data-source="parkster"] { background: #4daa5b; border-color: #4daa5b; color: #fff; }
+.src-filter.active[data-source="parkering_gbg"] { background: #387aba; border-color: #387aba; color: #fff; }
+.src-filter.active[data-source="epark"] { background: #00a89e; border-color: #00a89e; color: #fff; }
 #filter-toggle.has-custom { border-color: var(--accent); color: var(--accent); }
 [data-theme="light"] .filter-panel { border-color: rgba(0,0,0,0.1); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
 
@@ -429,7 +432,7 @@ body {
 <div id="header">
   <h1>🅿️ Parking GBG</h1>
   <a class="author" href="https://github.com/abhineetst18" target="_blank" rel="noopener">by Abhineet</a>
-  <span id="stats" class="stats"></span>
+
   <button id="lang-btn" class="hdr-btn" title="Toggle language">🇸🇪</button>
   <button id="theme-btn" class="hdr-btn" title="Toggle light/dark mode">☀️</button>
   <button id="satellite-btn" class="hdr-btn" title="Toggle satellite view">🛰️</button>
@@ -456,10 +459,10 @@ body {
         <div class="filter-section-label">Sources</div>
         <div class="filter-group">
           <button class="btn filter-btn" data-source="all" onclick="toggleSource(this)">All</button>
-          <button class="btn filter-btn active" data-source="easypark" onclick="toggleSource(this)">EP</button>
-          <button class="btn filter-btn active" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
-          <button class="btn filter-btn active" data-source="parkering_gbg" onclick="toggleSource(this)">GBG</button>
-          <button class="btn filter-btn active" data-source="epark" onclick="toggleSource(this)">ePARK</button>
+          <button class="btn filter-btn src-filter active" data-source="easypark" onclick="toggleSource(this)">EasyPark</button>
+          <button class="btn filter-btn src-filter active" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
+          <button class="btn filter-btn src-filter active" data-source="parkering_gbg" onclick="toggleSource(this)">P.GBG</button>
+          <button class="btn filter-btn src-filter active" data-source="epark" onclick="toggleSource(this)">ePARK</button>
         </div>
         <div class="filter-section-label">Type</div>
         <div class="filter-group">
@@ -861,7 +864,7 @@ function makeMarker(spot) {
       <a class="popup-pill" href="${navUrl}" target="_blank" rel="noopener">🚶 Navigate</a>
       <a class="popup-pill" href="${svUrl}" target="_blank" rel="noopener">👁️ Street View</a>
     </div>
-  `, { maxWidth: 280 });
+  `, { maxWidth: 280, autoPanPaddingTopLeft: [10, 10], autoPanPaddingBottomRight: [10, 10], autoPan: true, keepInView: true });
 
   marker._spotId = spot.id;
   return marker;
@@ -880,29 +883,25 @@ function copyCode(code, btn) {
 }
 
 function _buildAppBtn(src, code) {
+  if (!_isMobile) return '';
+  let href = '';
   if (src === 'easypark') {
-    if (_isMobile) return ` <a class="popup-pill" href="easypark://area/${code}">▶ Open</a>`;
-    return '';
+    href = `easypark://area/${code}`;
+  } else if (src === 'parkster') {
+    href = _isIOS
+      ? `https://parkster.com/sv/parkering/${code}`
+      : `intent://zone/${code}#Intent;scheme=parkster;package=se.parkster.app;end`;
+  } else if (src === 'parkering_gbg') {
+    href = _isIOS
+      ? `https://apps.apple.com/se/app/parkering-g%C3%B6teborg/id1184264972`
+      : `intent://parking/${code}#Intent;scheme=parkeringgbg;package=se.goteborg.pbolaget.android;S.browser_fallback_url=https://play.google.com/store/apps/details?id=se.goteborg.pbolaget.android;end`;
+  } else if (src === 'epark') {
+    href = _isIOS
+      ? `https://apps.apple.com/se/app/epark/id500644505`
+      : `intent://zone/${code}#Intent;scheme=eparkera;package=se.netix.eparkera;S.browser_fallback_url=https://play.google.com/store/apps/details?id=se.netix.eparkera;end`;
   }
-  if (src === 'parkster') {
-    if (_isMobile) return ` <a class="popup-pill" href="parkster://zone/${code}">▶ Open</a>`;
-    return '';
-  }
-  if (src === 'parkering_gbg') {
-    const url = _isIOS
-      ? 'https://apps.apple.com/se/app/parkering-g%C3%B6teborg/id1184264972'
-      : _isAndroid ? 'https://play.google.com/store/apps/details?id=se.goteborg.pbolaget.android' : '';
-    if (url) return ` <a class="popup-pill" href="${url}" target="_blank" rel="noopener">▶ Open</a>`;
-    return '';
-  }
-  if (src === 'epark') {
-    const url = _isIOS
-      ? 'https://apps.apple.com/se/app/epark/id500644505'
-      : _isAndroid ? 'https://play.google.com/store/apps/details?id=se.netix.eparkera' : '';
-    if (url) return ` <a class="popup-pill" href="${url}" target="_blank" rel="noopener">▶ Open</a>`;
-    return '';
-  }
-  return '';
+  if (!href) return '';
+  return ` <a class="popup-pill" href="${href}" onclick="copyCode('${code}',null)">▶ Open</a>`;
 }
 
 function escHtml(s) {
@@ -917,8 +916,7 @@ async function loadData() {
     const resp = await fetch('parking_data.json');
     const data = await resp.json();
     allSpots = data.spots || [];
-    document.getElementById('stats').textContent =
-      `${allSpots.length} spots · ${data.generated?.slice(0,10) || ''}`;
+
     refreshMap();
     document.getElementById('loading').classList.add('hidden');
   } catch (e) {
