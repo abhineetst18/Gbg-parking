@@ -157,8 +157,9 @@ body {
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 12px;
   padding: 10px 12px;
-  z-index: 1000;
+  z-index: 1001;
   min-width: fit-content;
+  max-width: calc(100vw - 24px);
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 .filter-panel.open { display: block; }
@@ -273,7 +274,6 @@ body {
   border-radius: 20px;
   font-size: 12px;
   width: 100%;
-  max-width: 220px;
 }
 #location-input::placeholder { color: var(--text-dim); }
 
@@ -418,7 +418,7 @@ body {
 
 @media (min-width: 768px) {
   #panel { max-height: 35dvh; }
-  #location-input { max-width: 300px; }
+  #location-input { max-width: none; }
 }
 </style>
 </head>
@@ -445,7 +445,7 @@ body {
   <div id="controls">
     <button class="btn locate" onclick="locateMe()">📍 My Location</button>
     <button class="btn" onclick="enableDropPin()" title="Drop a pin on the map">📌 Drop Pin</button>
-    <div style="position:relative">
+    <div style="position:relative;flex:1;min-width:120px;max-width:220px">
       <input id="location-input" type="text" placeholder="Search address or place..." autocomplete="off">
       <div id="autocomplete"></div>
     </div>
@@ -1225,21 +1225,24 @@ document.addEventListener('click', e => {
   });
 });
 function updateFilterToggleState() {
-  // Apps button
+  // Apps button — count symmetric difference from defaults
   const appsBtn = document.getElementById('apps-toggle');
   const defaultSources = new Set(['easypark','parkster','parkering_gbg','epark']);
-  const srcCustom = activeSources.size !== defaultSources.size || [...activeSources].some(s => !defaultSources.has(s));
-  appsBtn.classList.toggle('has-custom', srcCustom);
-  const srcOff = 4 - activeSources.size;
-  appsBtn.textContent = srcOff > 0 ? `📱 Apps (${srcOff})` : '📱 Apps';
-  // Filter button
+  const srcDiff = [...activeSources].filter(s => !defaultSources.has(s)).length
+    + [...defaultSources].filter(s => !activeSources.has(s)).length;
+  appsBtn.classList.toggle('has-custom', srcDiff > 0);
+  appsBtn.textContent = srcDiff > 0 ? `📱 Apps (${srcDiff})` : '📱 Apps';
+  // Update All button visual
+  const allBtn = document.querySelector('.filter-btn[data-source="all"]');
+  if (allBtn) allBtn.classList.toggle('active', activeSources.size >= 4);
+  // Filter button — count symmetric difference from defaults + hideFree
   const filterBtn = document.getElementById('filter-toggle');
   const defaultTypes = new Set(['street','garage','lot','other']);
-  const typeCustom = hideFree ||
-    activeTypes.size !== defaultTypes.size || [...activeTypes].some(t => !defaultTypes.has(t));
-  filterBtn.classList.toggle('has-custom', typeCustom);
-  const typeOff = (4 - activeTypes.size) + (hideFree ? 1 : 0);
-  filterBtn.textContent = typeOff > 0 ? `⚙️ Filters (${typeOff})` : '⚙️ Filters';
+  const typeDiff = [...activeTypes].filter(t => !defaultTypes.has(t)).length
+    + [...defaultTypes].filter(t => !activeTypes.has(t)).length
+    + (hideFree ? 1 : 0);
+  filterBtn.classList.toggle('has-custom', typeDiff > 0);
+  filterBtn.textContent = typeDiff > 0 ? `⚙️ Filters (${typeDiff})` : '⚙️ Filters';
 }
 
 function toggleSource(btn) {
