@@ -281,9 +281,13 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
         if len(area_code) >= 7 and area_code[:4] in gbg_codes:
             gbg_code = area_code[:4]
 
+        raw_name = detail.get("areaName", f"EasyPark {ano}")
+        # Strip zone-code prefix (e.g. "801 Tredje Långgatan" → "Tredje Långgatan")
+        ep_name = re.sub(r"^\d{3,5}\s+", "", raw_name).strip() or raw_name
+
         results.append({
             "id": f"ep_{ano}",
-            "name": detail.get("areaName", f"EasyPark {ano}"),
+            "name": ep_name,
             "lat": round(lat, 6),
             "lon": round(lon, 6),
             "price_sek_hr": price,
