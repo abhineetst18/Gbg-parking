@@ -624,6 +624,7 @@ body {
 let allSpots = [];
 let userLat = null, userLon = null;
 let map, userMarker, clusterGroup;
+let markerById = new Map();
 let activeSources = new Set(['easypark', 'parkster', 'parkering_gbg', 'epark']);
 let activeTypes = new Set(['street', 'garage', 'lot', 'other']);
 let hideFree = false;
@@ -1099,6 +1100,7 @@ function refreshMap() {
   // Update map markers
   clusterGroup.clearLayers();
   const markers = sorted.slice(0, 2000).map(makeMarker);
+  markerById = new Map(markers.map(m => [m._spotId, m]));
   clusterGroup.addLayers(markers);
 
   // Update result count
@@ -1139,13 +1141,14 @@ function refreshMap() {
 }
 
 function flyTo(lat, lon, id) {
-  map.flyTo([lat, lon], 17, { duration: 0.5 });
-  // Open popup
-  clusterGroup.eachLayer(layer => {
-    if (layer._spotId === id) {
-      setTimeout(() => layer.openPopup(), 600);
-    }
-  });
+  const marker = markerById.get(id);
+  if (marker) {
+    clusterGroup.zoomToShowLayer(marker, () => {
+      marker.openPopup();
+    });
+  } else {
+    map.flyTo([lat, lon], 17, { duration: 0.5 });
+  }
 }
 
 // ── Location ──
