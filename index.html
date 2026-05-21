@@ -1141,13 +1141,26 @@ function refreshMap() {
 }
 
 function flyTo(lat, lon, id) {
+  // Collapse panel so map is visible
+  const panel = document.getElementById('panel');
+  if (!panel.classList.contains('collapsed')) {
+    panel.classList.add('collapsed');
+    document.getElementById('panel-header').setAttribute('aria-expanded', 'false');
+    setTimeout(() => map.invalidateSize(), 350);
+  }
+
   const marker = markerById.get(id);
   if (marker) {
-    clusterGroup.zoomToShowLayer(marker, () => {
-      marker.openPopup();
-    });
+    // Small delay to let panel collapse and map resize
+    setTimeout(() => {
+      clusterGroup.zoomToShowLayer(marker, () => {
+        marker.openPopup();
+      });
+    }, 400);
   } else {
-    map.flyTo([lat, lon], 17, { duration: 0.5 });
+    setTimeout(() => {
+      map.flyTo([lat, lon], 17, { duration: 0.5 });
+    }, 400);
   }
 }
 
