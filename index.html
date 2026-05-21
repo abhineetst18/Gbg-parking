@@ -1,18 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sv" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://unpkg.com; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: blob: https://*.cartocdn.com https://*.arcgisonline.com https://server.arcgisonline.com; connect-src 'self' https://photon.komoot.io https://nominatim.openstreetmap.org; frame-ancestors 'none'; base-uri 'self'; form-action 'none';">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1a1a2e">
+<meta name="theme-color" content="#ffffff">
 <title>Parking Gothenburg</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" integrity="sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO+BR5Csr6Dhqq+nZs59P0pPKQJkEV" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" integrity="sha384-wgw+aLYNQ7dlhK47ZPK7FRACiq7ROZwgFNg0m04avm4CaXS+Z9Y7nMu8yNjBKYC+" crossorigin="">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 :root {
   --bg: #1a1a2e;
   --surface: #16213e;
@@ -24,6 +26,16 @@
   --text: #f0f0f0;
   --text-dim: #a0a0b0;
   --radius: 12px;
+  --surface-hover: rgba(255,255,255,0.04);
+  --surface-pressed: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.08);
+  --focus-ring: var(--accent);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --duration-quick: 100ms;
+  --duration-standard: 200ms;
+  --duration-emphasis: 300ms;
 }
 [data-theme="light"] {
   --bg: #f0f2f5;
@@ -31,6 +43,9 @@
   --surface2: #e4e6eb;
   --text: #1c1e21;
   --text-dim: #65676b;
+  --surface-hover: rgba(0,0,0,0.03);
+  --surface-pressed: rgba(0,0,0,0.06);
+  --border: rgba(0,0,0,0.1);
 }
 [data-theme="light"] .leaflet-popup-content-wrapper { background: #fff !important; color: #1c1e21 !important; }
 [data-theme="light"] .leaflet-popup-tip { background: #fff !important; }
@@ -50,6 +65,7 @@ body {
 #header {
   background: var(--surface);
   padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top));
   display: flex;
   align-items: center;
   gap: 8px;
@@ -64,11 +80,12 @@ body {
   #header h1 { font-size: 14px; }
 }
 #header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
-#header .author { font-size: 10px; color: var(--text-dim); text-decoration: none; opacity: 0.6; }
+#header .author { font-size: 11px; color: var(--text-dim); text-decoration: none; opacity: 0.6; }
 #header .author:hover { opacity: 1; }
 .hdr-btn { flex-shrink: 0; background: none; border: 1px solid rgba(255,255,255,0.1); font-size: 14px; cursor: pointer; padding: 3px 7px; border-radius: 8px; line-height: 1; color: var(--text-dim); transition: all 0.15s; }
 .hdr-btn:hover { color: var(--text); background: rgba(255,255,255,0.06); }
 .hdr-btn:active { transform: scale(0.92); }
+.hdr-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .hdr-btn.active { background: var(--surface2); border-color: var(--accent); }
 [data-theme="light"] .hdr-btn { border-color: rgba(0,0,0,0.12); }
 [data-theme="light"] .hdr-btn:hover { background: rgba(0,0,0,0.04); }
@@ -82,7 +99,7 @@ body {
 /* Bottom panel */
 #panel {
   background: var(--surface);
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid var(--border);
   max-height: 45dvh;
   display: flex;
   flex-direction: column;
@@ -92,6 +109,11 @@ body {
 }
 #panel.collapsed { max-height: 44px; }
 #panel-header {
+  background: none;
+  border: none;
+  width: 100%;
+  font: inherit;
+  color: inherit;
   padding: 10px 12px;
   display: flex;
   align-items: center;
@@ -99,6 +121,8 @@ body {
   cursor: pointer;
   flex-shrink: 0;
 }
+#panel-header:hover { background: var(--surface-hover); }
+#panel-header:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 #panel-header .handle {
   width: 36px; height: 4px;
   background: rgba(255,255,255,0.2);
@@ -184,6 +208,7 @@ body {
 #results {
   overflow-y: auto;
   padding: 0 12px 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
 }
 .result-card {
@@ -200,6 +225,7 @@ body {
 }
 .result-card:hover { background: var(--surface2); }
 .result-card:active { background: var(--surface2); transform: scale(0.99); }
+.result-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .result-card .price-badge {
   min-width: 52px;
   text-align: center;
@@ -420,6 +446,23 @@ body {
   #panel { max-height: 35dvh; }
   #location-input { max-width: none; }
 }
+.update-toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--surface); color: var(--text); padding: 12px 16px;
+  border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 10000; display: flex; align-items: center; gap: 12px;
+  font-size: 13px; border: 1px solid var(--border);
+}
+.update-toast button {
+  background: var(--accent); color: white; border: none;
+  padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -433,21 +476,22 @@ body {
   <h1>🅿️ Parking GBG</h1>
   <a class="author" href="https://github.com/abhineetst18" target="_blank" rel="noopener">by Abhineet</a>
   <span style="flex:1"></span>
-  <button id="lang-btn" class="hdr-btn" title="Toggle language">🇸🇪</button>
-  <button id="theme-btn" class="hdr-btn" title="Toggle light/dark mode">☀️</button>
-  <button id="satellite-btn" class="hdr-btn" title="Toggle satellite view">🛰️</button>
+  <button id="lang-btn" class="hdr-btn" title="Toggle language" aria-label="Toggle language">🇸🇪</button>
+  <button id="theme-btn" class="hdr-btn" title="Toggle light/dark mode" aria-label="Toggle light or dark mode">🌙</button>
+  <button id="satellite-btn" class="hdr-btn" title="Toggle satellite view" aria-label="Toggle satellite view">🛰️</button>
 </div>
 
 <div id="map"></div>
 
 <div id="panel">
-  <div id="panel-header"><div class="handle"></div></div>
+  <button id="panel-header" aria-expanded="true" aria-controls="controls" aria-label="Toggle panel"><div class="handle"></div></button>
   <div id="controls">
-    <button class="btn locate" onclick="locateMe()">📍 My Location</button>
-    <button class="btn" onclick="enableDropPin()" title="Drop a pin on the map">📌 Drop Pin</button>
+    <button class="btn locate" onclick="locateMe()" aria-label="Use my location">📍 My Location</button>
+    <button class="btn" onclick="enableDropPin()" title="Drop a pin on the map" aria-label="Drop a pin on the map">📌 Drop Pin</button>
     <div style="position:relative;flex:1;min-width:120px;max-width:220px">
-      <input id="location-input" type="text" placeholder="Search address or place..." autocomplete="off">
-      <div id="autocomplete"></div>
+      <label for="location-input" class="sr-only">Search address or place</label>
+      <input id="location-input" type="search" placeholder="Search address or place..." autocomplete="off" enterkeyhint="search" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="autocomplete" aria-autocomplete="list">
+      <div id="autocomplete" role="listbox"></div>
     </div>
     <select id="sort-select">
       <option value="distance">Nearest</option>
@@ -456,28 +500,28 @@ body {
     <div class="filter-dropdown" id="apps-dropdown">
       <button class="btn" id="apps-toggle" onclick="togglePanel('apps-panel')">📱 Apps</button>
       <div class="filter-panel" id="apps-panel">
-        <div class="filter-group">
-          <button class="btn filter-btn" data-source="all" onclick="toggleSource(this)">All</button>
-          <button class="btn filter-btn src-filter active" data-source="easypark" onclick="toggleSource(this)">EasyPark</button>
-          <button class="btn filter-btn src-filter active" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
-          <button class="btn filter-btn src-filter active" data-source="parkering_gbg" onclick="toggleSource(this)">P.GBG</button>
-          <button class="btn filter-btn src-filter active" data-source="epark" onclick="toggleSource(this)">ePARK</button>
+        <div class="filter-group" role="group" aria-label="Parking provider">
+          <button class="btn filter-btn" aria-pressed="false" data-source="all" onclick="toggleSource(this)">All</button>
+          <button class="btn filter-btn src-filter active" aria-pressed="true" data-source="easypark" onclick="toggleSource(this)">EasyPark</button>
+          <button class="btn filter-btn src-filter active" aria-pressed="true" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
+          <button class="btn filter-btn src-filter active" aria-pressed="true" data-source="parkering_gbg" onclick="toggleSource(this)">P.GBG</button>
+          <button class="btn filter-btn src-filter active" aria-pressed="true" data-source="epark" onclick="toggleSource(this)">ePARK</button>
         </div>
       </div>
     </div>
     <div class="filter-dropdown" id="filter-dropdown">
       <button class="btn" id="filter-toggle" onclick="togglePanel('filter-panel')">⚙️ Filters</button>
       <div class="filter-panel" id="filter-panel">
-        <div class="filter-group">
-          <button class="btn filter-btn active" data-type="street" onclick="toggleType(this)">🛣️ Street</button>
-          <button class="btn filter-btn active" data-type="garage" onclick="toggleType(this)">🏢 Garage</button>
-          <button class="btn filter-btn active" data-type="lot" onclick="toggleType(this)">🅿️ Lot</button>
-          <button class="btn filter-btn" data-type="ev" onclick="toggleType(this)">⚡ EV</button>
-          <button class="btn filter-btn active" data-type="other" onclick="toggleType(this)">Other</button>
-          <button class="btn filter-btn" id="hide-free-btn" onclick="toggleHideFree(this)">🚫 Hide Free</button>
+        <div class="filter-group" role="group" aria-label="Parking type">
+          <button class="btn filter-btn active" aria-pressed="true" data-type="street" onclick="toggleType(this)">🛣️ Street</button>
+          <button class="btn filter-btn active" aria-pressed="true" data-type="garage" onclick="toggleType(this)">🏢 Garage</button>
+          <button class="btn filter-btn active" aria-pressed="true" data-type="lot" onclick="toggleType(this)">🅿️ Lot</button>
+          <button class="btn filter-btn" aria-pressed="false" data-type="ev" onclick="toggleType(this)">⚡ EV</button>
+          <button class="btn filter-btn active" aria-pressed="true" data-type="other" onclick="toggleType(this)">Other</button>
         </div>
       </div>
     </div>
+    <button class="btn" aria-pressed="false" id="hide-free-btn" onclick="toggleHideFree(this)">🚫 Hide Free</button>
   </div>
   <div id="radius-row">
     <span>Radius:</span>
@@ -487,8 +531,8 @@ body {
   <div id="results"></div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin=""></script>
 <script>
 'use strict';
 
@@ -705,7 +749,7 @@ function translateSv(text) {
 let radiusCircle = null;
 let pinMarker = null;
 let dropPinMode = false;
-let isDark = true;
+let isDark = false;
 let isSatellite = false;
 
 // ── Map init ──
@@ -732,8 +776,8 @@ const lightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/
 const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   maxZoom: 19,
 });
-let activeLayer = darkLayer;
-darkLayer.addTo(map);
+let activeLayer = lightLayer;
+lightLayer.addTo(map);
 
 clusterGroup = L.markerClusterGroup({
   maxClusterRadius: 40,
@@ -774,7 +818,8 @@ const TYPE_LABELS = { street: 'Street Parking', lot: 'Parking Lot', garage: 'Gar
 function typeBadge(type) {
   const icon = TYPE_ICONS[type] || '';
   const label = TYPE_LABELS[type] || type.charAt(0).toUpperCase() + type.slice(1);
-  return `<span class="type-badge type-${type}">${icon} ${label}</span>`;
+  const safeType = type.replace(/[^a-zA-Z0-9_-]/g, '');
+  return `<span class="type-badge type-${safeType}">${icon} ${escHtml(label)}</span>`;
 }
 
 function seasonalBadge(spot) {
@@ -827,9 +872,9 @@ function makeMarker(spot) {
   } else {
     priceStr = 'Price unknown';
   }
-  const limitStr = spot.time_limit ? `<br>⏱ Max ${spot.time_limit}` : (spot.time_limited_free ? '<br>⏱ Check sign for time limit' : '');
-  const maxDailyStr = spot.max_daily_sek ? ` · Max ${spot.max_daily_sek} SEK/day` : '';
-  const freeMinStr = spot.free_minutes ? `<br>🆓 First ${spot.free_minutes >= 60 ? (spot.free_minutes/60)+'h' : spot.free_minutes+'min'} free` : '';
+  const limitStr = spot.time_limit ? `<br>⏱ Max ${escHtml(String(spot.time_limit))}` : (spot.time_limited_free ? '<br>⏱ Check sign for time limit' : '');
+  const maxDailyStr = spot.max_daily_sek ? ` · Max ${parseFloat(spot.max_daily_sek) || ''} SEK/day` : '';
+  const freeMinStr = spot.free_minutes ? `<br>🆓 First ${+spot.free_minutes >= 60 ? (+spot.free_minutes/60)+'h' : Math.round(+spot.free_minutes)+'min'} free` : '';
   const permitStr = spot.permit_required ? '<br>🪪 Permit required (some hours)' : '';
   const svcFeeStr = spot.service_fee ? '<br>💳 Service fee may apply' : '';
   const distStr = spot._dist != null ? `<br>${formatDist(spot._dist)} away` : '';
@@ -843,7 +888,7 @@ function makeMarker(spot) {
     for (const [src, code] of codeEntries) {
       const logo = srcLogo(src);
       const appBtn = _buildAppBtn(src, code);
-      codeHtml += `<div class="code-row">${logo} <span class="code-num">${escHtml(code)}</span> <button class="popup-pill" onclick="copyCode('${escHtml(code)}',this)">📋</button>${appBtn}</div>`;
+      codeHtml += `<div class="code-row">${logo} <span class="code-num">${escHtml(code)}</span> <button class="popup-pill" onclick="copyCode(${escHtml(JSON.stringify(code))},this)">📋</button>${appBtn}</div>`;
     }
     codeHtml += `</div>`;
   }
@@ -884,25 +929,25 @@ function copyCode(code, btn) {
 
 function _buildAppBtn(src, code) {
   if (!_isMobile) return '';
+  const enc = encodeURIComponent(code);
   let href = '';
   if (src === 'easypark') {
-    href = `easypark://area/${code}`;
+    href = `easypark://area/${enc}`;
   } else if (src === 'parkster') {
     href = _isIOS
-      ? `https://parkster.com/sv/parkering/${code}`
-      : `intent://zone/${code}#Intent;scheme=parkster;package=se.parkster.app;end`;
+      ? `https://parkster.com/sv/parkering/${enc}`
+      : `intent://zone/${enc}#Intent;scheme=parkster;package=se.parkster.app;end`;
   } else if (src === 'parkering_gbg') {
     href = _isIOS
       ? `https://apps.apple.com/se/app/parkering-g%C3%B6teborg/id1184264972`
-      : `intent://parking/${code}#Intent;scheme=parkeringgbg;package=se.goteborg.pbolaget.android;S.browser_fallback_url=https://play.google.com/store/apps/details?id=se.goteborg.pbolaget.android;end`;
+      : `intent://parking/${enc}#Intent;scheme=parkeringgbg;package=se.goteborg.pbolaget.android;S.browser_fallback_url=https://play.google.com/store/apps/details?id=se.goteborg.pbolaget.android;end`;
   } else if (src === 'epark') {
     href = _isIOS
       ? `https://apps.apple.com/se/app/epark/id500644505`
-      : `intent://zone/${code}#Intent;scheme=eparkera;package=se.netix.eparkera;S.browser_fallback_url=https://play.google.com/store/apps/details?id=se.netix.eparkera;end`;
+      : `intent://zone/${enc}#Intent;scheme=eparkera;package=se.netix.eparkera;S.browser_fallback_url=https://play.google.com/store/apps/details?id=se.netix.eparkera;end`;
   }
   if (!href) return '';
-  const safeCode = code.replace(/'/g, "\\'");
-  return ` <a class="popup-pill" href="${href}" onclick="copyCode('${safeCode}',null)">▶ Open</a>`;
+  return ` <a class="popup-pill" href="${escHtml(href)}" onclick="copyCode(${escHtml(JSON.stringify(code))},null)">▶ Open</a>`;
 }
 
 function escHtml(s) {
@@ -927,6 +972,9 @@ async function loadData() {
 }
 
 // ── Refresh map + list ──
+// TODO: Performance — cache markers by spot.id and update cluster membership
+// incrementally instead of full rebuild. Not urgent at 3,607 spots with
+// MarkerCluster handling DOM, but would reduce jank on low-end mobile.
 function refreshMap() {
   const filtered = allSpots.filter(s =>
     (s.sources || []).some(src => activeSources.has(src)) && activeTypes.has(s.type)
@@ -980,7 +1028,7 @@ function refreshMap() {
     else { priceStr = '?'; }
     const priceUnit = s.time_limited_free ? '<span style="font-size:9px;font-weight:400">free</span>' : '<span style="font-size:9px;font-weight:400">kr/h</span>';
     const distStr = s._dist != null ? formatDist(s._dist) : '';
-    let limitBadge = s.time_limit ? `<span style="color:var(--yellow);font-size:10px"> ⏱${s.time_limit}</span>` : '';
+    let limitBadge = s.time_limit ? `<span style="color:var(--yellow);font-size:10px"> ⏱${escHtml(String(s.time_limit))}</span>` : '';
     if (!limitBadge && s.time_limited_free) limitBadge = '<span style="color:var(--yellow);font-size:10px"> ⏱ check sign</span>';
     const freeBadge = s.free_minutes ? `<span style="color:var(--green);font-size:10px"> 🆓${s.free_minutes >= 60 ? (s.free_minutes/60)+'h' : s.free_minutes+'min'}</span>` : '';
     const permitBadge = s.permit_required ? '<span style="color:var(--text-dim);font-size:10px"> 🪪</span>' : '';
@@ -989,7 +1037,7 @@ function refreshMap() {
     const codeBadge = firstCode ? `<span style="color:var(--text-dim);font-size:10px;font-family:monospace"> #${escHtml(firstCode)}</span>` : '';
     const srcLogos = (s.sources || []).map(srcLogo).join(' ');
     return `
-      <div class="result-card" onclick="flyTo(${s.lat},${s.lon},'${s.id}')">
+      <div class="result-card" tabindex="0" role="button" onclick="flyTo(${parseFloat(s.lat)},${parseFloat(s.lon)},${escHtml(JSON.stringify(s.id))})">
         <div class="price-badge ${priceClass(s.price_sek_hr)}">${priceStr}<br>${priceUnit}</div>
         <div class="info">
           <div class="name">${escHtml(s.name)}${limitBadge}${freeBadge}${permitBadge}${codeBadge}</div>
@@ -1252,12 +1300,14 @@ function toggleSource(btn) {
     document.querySelectorAll('.filter-btn[data-source]').forEach(b => {
       if (b.dataset.source !== 'all') {
         b.classList.toggle('active', !allActive);
+        b.setAttribute('aria-pressed', String(!allActive));
         if (allActive) activeSources.delete(b.dataset.source);
         else activeSources.add(b.dataset.source);
       }
     });
   } else {
     btn.classList.toggle('active');
+    btn.setAttribute('aria-pressed', String(btn.classList.contains('active')));
     if (btn.classList.contains('active')) activeSources.add(src);
     else activeSources.delete(src);
   }
@@ -1268,6 +1318,7 @@ function toggleSource(btn) {
 function toggleType(btn) {
   const type = btn.dataset.type;
   btn.classList.toggle('active');
+  btn.setAttribute('aria-pressed', String(btn.classList.contains('active')));
   if (btn.classList.contains('active')) activeTypes.add(type);
   else activeTypes.delete(type);
   updateFilterToggleState();
@@ -1277,6 +1328,7 @@ function toggleType(btn) {
 function toggleHideFree(btn) {
   hideFree = !hideFree;
   btn.classList.toggle('active', hideFree);
+  btn.setAttribute('aria-pressed', String(hideFree));
   updateFilterToggleState();
   refreshMap();
 }
@@ -1317,6 +1369,7 @@ const langBtn = document.getElementById('lang-btn');
 langBtn.addEventListener('click', () => {
   lang = lang === 'sv' ? 'en' : 'sv';
   langBtn.textContent = lang === 'sv' ? '🇸🇪' : '🇬🇧';
+  document.documentElement.lang = lang;
   refreshMap();
 });
 
@@ -1384,13 +1437,36 @@ map.on('click', e => {
 
 // ── Panel toggle ──
 document.getElementById('panel-header').addEventListener('click', () => {
-  document.getElementById('panel').classList.toggle('collapsed');
+  const panel = document.getElementById('panel');
+  panel.classList.toggle('collapsed');
+  const header = document.getElementById('panel-header');
+  header.setAttribute('aria-expanded', !panel.classList.contains('collapsed'));
   setTimeout(() => map.invalidateSize(), 350);
+});
+
+// ── Result card keyboard handler ──
+document.getElementById('results').addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('result-card')) {
+    e.preventDefault();
+    e.target.click();
+  }
 });
 
 // ── Service worker ──
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+          const toast = document.createElement('div');
+          toast.className = 'update-toast';
+          toast.innerHTML = 'App updated! <button onclick="location.reload()">Reload</button>';
+          document.body.appendChild(toast);
+        }
+      });
+    });
+  }).catch(() => {});
 }
 
 // ── Init ──

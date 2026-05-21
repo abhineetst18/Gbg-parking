@@ -1,4 +1,6 @@
-const CACHE_NAME = 'parking-gbg-v33';
+const CACHE_NAME = 'parking-gbg-v34';
+const TILE_CACHE = 'parking-gbg-tiles-v1';
+const MAX_TILES = 500;
 const ASSETS = [
   './',
   './index.html',
@@ -20,11 +22,21 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE_NAME && k !== TILE_CACHE).map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
+
+function trimCache(cacheName, maxItems) {
+  caches.open(cacheName).then(cache =>
+    cache.keys().then(keys => {
+      if (keys.length > maxItems) {
+        cache.delete(keys[0]).then(() => trimCache(cacheName, maxItems));
+      }
+    })
+  );
+}
 
 self.addEventListener('fetch', event => {
   const url = event.request.url;
@@ -34,8 +46,10 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(event.request)
         .then(resp => {
-          const clone = resp.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          if (resp.ok) {
+            const clone = resp.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          }
           return resp;
         })
         .catch(() => caches.match(event.request))
@@ -43,15 +57,19 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache map tiles (CartoDB + Esri satellite)
+  // Cache map tiles (CartoDB + Esri satellite) — separate bounded cache
   if (url.includes('basemaps.cartocdn.com') || url.includes('arcgisonline.com')) {
     event.respondWith(
-      caches.match(event.request).then(cached =>
-        cached || fetch(event.request).then(resp => {
-          const clone = resp.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          return resp;
-        })
+      caches.open(TILE_CACHE).then(cache =>
+        cache.match(event.request).then(cached =>
+          cached || fetch(event.request).then(resp => {
+            if (resp.ok) {
+              cache.put(event.request, resp.clone());
+              trimCache(TILE_CACHE, MAX_TILES);
+            }
+            return resp;
+          })
+        )
       )
     );
     return;
