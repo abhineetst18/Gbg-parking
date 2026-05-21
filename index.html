@@ -1128,7 +1128,7 @@ function refreshMap() {
     const codeBadge = firstCode ? `<span style="color:var(--text-dim);font-size:10px;font-family:monospace"> #${escHtml(firstCode)}</span>` : '';
     const srcLogos = (s.sources || []).map(srcLogo).join(' ');
     return `
-      <div class="result-card" tabindex="0" role="button" onclick="flyTo(${parseFloat(s.lat)},${parseFloat(s.lon)},${escHtml(JSON.stringify(s.id))})">
+      <div class="result-card" tabindex="0" role="button" data-lat="${parseFloat(s.lat)}" data-lon="${parseFloat(s.lon)}" data-id="${escHtml(s.id)}">
         <div class="price-badge ${priceClass(s.price_sek_hr)}">${priceStr}<br>${priceUnit}</div>
         <div class="info">
           <div class="name">${escHtml(s.name)}${limitBadge}${freeBadge}${permitBadge}${codeBadge}</div>
@@ -1559,6 +1559,16 @@ document.getElementById('panel-header').addEventListener('click', () => {
   const header = document.getElementById('panel-header');
   header.setAttribute('aria-expanded', !panel.classList.contains('collapsed'));
   setTimeout(() => map.invalidateSize(), 350);
+});
+
+// ── Result card click/tap handler (event delegation) ──
+document.getElementById('results').addEventListener('click', e => {
+  const card = e.target.closest('.result-card');
+  if (!card) return;
+  const lat = parseFloat(card.dataset.lat);
+  const lon = parseFloat(card.dataset.lon);
+  const id = card.dataset.id;
+  flyTo(lat, lon, id);
 });
 
 // ── Result card keyboard handler ──
