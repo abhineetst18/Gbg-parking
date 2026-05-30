@@ -147,10 +147,12 @@ body {
   flex-wrap: wrap;
   flex-shrink: 0;
   max-height: 76px;
-  overflow: hidden;
+  overflow: visible;
 }
 #controls .hide-free-label { display: inline; }
 @media (max-width: 420px) {
+  #controls { max-height: 108px; }
+  #controls .btn { padding: 6px 8px; font-size: 11px; }
   #controls .hide-free .hide-free-icon { display: none; }
   #controls .hide-free { padding: 6px 10px; }
 }
@@ -285,15 +287,15 @@ body {
 
 /* Autocomplete dropdown */
 #autocomplete {
-  position: absolute;
+  position: fixed;
   background: var(--surface);
   border: 1px solid rgba(255,255,255,0.15);
   border-radius: 12px;
   max-height: 200px;
   overflow-y: auto;
-  z-index: 2000;
+  z-index: 9999;
   display: none;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   width: 260px;
 }
 #autocomplete.visible { display: block; }
@@ -1292,6 +1294,12 @@ async function fetchSuggestions(q) {
 
 function showSuggestions(results) {
   if (!results.length) { hideAutocomplete(); return; }
+  // Position the fixed dropdown below the input
+  const input = document.getElementById('location-input');
+  const rect = input.getBoundingClientRect();
+  acEl.style.top = (rect.bottom + 4) + 'px';
+  acEl.style.left = rect.left + 'px';
+  acEl.style.width = Math.max(rect.width, 220) + 'px';
   acEl.innerHTML = results.map((r, i) => {
     const parts = r.display_name.split(',');
     const name = parts[0].trim();
