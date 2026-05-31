@@ -176,7 +176,7 @@ body {
 [data-theme="light"] .btn:hover { background: rgba(0,0,0,0.06); }
 [data-theme="light"] .btn.active { background: var(--accent); color: #fff; }
 [data-theme="light"] .btn.locate { background: var(--green); color: #fff; }
-#sort-select {
+#sort-select, #source-select, #type-select {
   background: var(--surface2);
   border: 1px solid rgba(255,255,255,0.1);
   color: var(--text);
@@ -185,39 +185,7 @@ body {
   font-size: 12px;
   cursor: pointer;
 }
-[data-theme="light"] #sort-select { border-color: rgba(0,0,0,0.1); }
-
-/* Filter dropdown */
-.filter-dropdown { position: relative; }
-.filter-panel {
-  display: none;
-  position: fixed;
-  z-index: 9999;
-  background: var(--surface);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 12px;
-  padding: 10px 12px;
-  min-width: fit-content;
-  max-width: calc(100vw - 24px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-}
-.filter-panel.open { display: block; }
-.filter-section-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  letter-spacing: 0.5px;
-  margin: 8px 0 4px;
-  padding: 0 2px;
-}
-.filter-section-label:first-child { margin-top: 0; }
-.filter-group { display: flex; flex-wrap: wrap; gap: 4px; }
-.src-filter.active[data-source="easypark"] { background: #ec5fa1; border-color: #ec5fa1; color: #fff; }
-.src-filter.active[data-source="parkster"] { background: #4daa5b; border-color: #4daa5b; color: #fff; }
-.src-filter.active[data-source="parkering_gbg"] { background: #387aba; border-color: #387aba; color: #fff; }
-.src-filter.active[data-source="epark"] { background: #00a89e; border-color: #00a89e; color: #fff; }
-#filter-toggle.has-custom, #apps-toggle.has-custom { border-color: var(--accent); color: var(--accent); }
-[data-theme="light"] .filter-panel { border-color: rgba(0,0,0,0.1); box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+[data-theme="light"] #sort-select, [data-theme="light"] #source-select, [data-theme="light"] #type-select { border-color: rgba(0,0,0,0.1); }
 
 /* Results list */
 #results {
@@ -578,30 +546,21 @@ body {
       <option value="distance">Nearest</option>
       <option value="price">Cheapest</option>
     </select>
-    <div class="filter-dropdown" id="apps-dropdown">
-      <button class="btn" id="apps-toggle" onclick="togglePanel('apps-panel')">📱 Apps</button>
-      <div class="filter-panel" id="apps-panel">
-        <div class="filter-group" role="group" aria-label="Parking provider">
-          <button class="btn filter-btn" aria-pressed="false" data-source="all" onclick="toggleSource(this)">All</button>
-          <button class="btn filter-btn src-filter active" aria-pressed="true" data-source="easypark" onclick="toggleSource(this)">EasyPark</button>
-          <button class="btn filter-btn src-filter active" aria-pressed="true" data-source="parkster" onclick="toggleSource(this)">Parkster</button>
-          <button class="btn filter-btn src-filter active" aria-pressed="true" data-source="parkering_gbg" onclick="toggleSource(this)">P.GBG</button>
-          <button class="btn filter-btn src-filter active" aria-pressed="true" data-source="epark" onclick="toggleSource(this)">ePARK</button>
-        </div>
-      </div>
-    </div>
-    <div class="filter-dropdown" id="filter-dropdown">
-      <button class="btn" id="filter-toggle" onclick="togglePanel('filter-panel')">⚙️ Filters</button>
-      <div class="filter-panel" id="filter-panel">
-        <div class="filter-group" role="group" aria-label="Parking type">
-          <button class="btn filter-btn active" aria-pressed="true" data-type="street" onclick="toggleType(this)">🛣️ Street</button>
-          <button class="btn filter-btn active" aria-pressed="true" data-type="garage" onclick="toggleType(this)">🏢 Garage</button>
-          <button class="btn filter-btn active" aria-pressed="true" data-type="lot" onclick="toggleType(this)">🅿️ Lot</button>
-          <button class="btn filter-btn" aria-pressed="false" data-type="ev" onclick="toggleType(this)">⚡ EV</button>
-          <button class="btn filter-btn active" aria-pressed="true" data-type="other" onclick="toggleType(this)">Other</button>
-        </div>
-      </div>
-    </div>
+    <select id="source-select">
+      <option value="all" selected>📱 All Apps</option>
+      <option value="easypark">EasyPark</option>
+      <option value="parkster">Parkster</option>
+      <option value="parkering_gbg">P.GBG</option>
+      <option value="epark">ePARK</option>
+    </select>
+    <select id="type-select">
+      <option value="all" selected>All Types</option>
+      <option value="street">🛣️ Street</option>
+      <option value="garage">🏢 Garage</option>
+      <option value="lot">🅿️ Lot</option>
+      <option value="ev">⚡ EV</option>
+      <option value="other">Other</option>
+    </select>
     <button class="btn hide-free" aria-pressed="false" id="hide-free-btn" onclick="toggleHideFree(this)"><span class="hide-free-icon">🚫 </span><span class="hide-free-label">Hide Free</span></button>
   </div>
   <div id="radius-row">
@@ -1368,82 +1327,30 @@ document.getElementById('location-input').addEventListener('keydown', async e =>
 });
 
 // ── Filters ──
-function togglePanel(id) {
-  // Close any other open panel first
-  document.querySelectorAll('.filter-panel.open').forEach(p => {
-    if (p.id !== id) p.classList.remove('open');
-  });
-  const panel = document.getElementById(id);
-  panel.classList.toggle('open');
-  if (panel.classList.contains('open')) {
-    // Position the fixed panel above its toggle button
-    const btn = panel.previousElementSibling;
-    const rect = btn.getBoundingClientRect();
-    panel.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 260)) + 'px';
-    panel.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
-    panel.style.top = '';
-  }
-}
-// Close panels when clicking outside
-document.addEventListener('click', e => {
-  document.querySelectorAll('.filter-dropdown').forEach(dd => {
-    if (!dd.contains(e.target)) {
-      dd.querySelector('.filter-panel')?.classList.remove('open');
-    }
-  });
-});
-function updateFilterToggleState() {
-  // Apps button — count symmetric difference from defaults
-  const appsBtn = document.getElementById('apps-toggle');
-  const defaultSources = new Set(['easypark','parkster','parkering_gbg','epark']);
-  const srcDiff = [...activeSources].filter(s => !defaultSources.has(s)).length
-    + [...defaultSources].filter(s => !activeSources.has(s)).length;
-  appsBtn.classList.toggle('has-custom', srcDiff > 0);
-  appsBtn.textContent = srcDiff > 0 ? `📱 Apps (${srcDiff})` : '📱 Apps';
-  // Update All button visual
-  const allBtn = document.querySelector('.filter-btn[data-source="all"]');
-  if (allBtn) allBtn.classList.toggle('active', activeSources.size >= 4);
-  // Filter button — count symmetric difference from defaults + hideFree
-  const filterBtn = document.getElementById('filter-toggle');
-  const defaultTypes = new Set(['street','garage','lot','other']);
-  const typeDiff = [...activeTypes].filter(t => !defaultTypes.has(t)).length
-    + [...defaultTypes].filter(t => !activeTypes.has(t)).length
-    + (hideFree ? 1 : 0);
-  filterBtn.classList.toggle('has-custom', typeDiff > 0);
-  filterBtn.textContent = typeDiff > 0 ? `⚙️ Filters (${typeDiff})` : '⚙️ Filters';
-}
+const sourceSelect = document.getElementById('source-select');
+const typeSelect = document.getElementById('type-select');
 
-function toggleSource(btn) {
-  const src = btn.dataset.source;
-  if (src === 'all') {
-    const allActive = activeSources.size >= 4;
-    document.querySelectorAll('.filter-btn[data-source]').forEach(b => {
-      if (b.dataset.source !== 'all') {
-        b.classList.toggle('active', !allActive);
-        b.setAttribute('aria-pressed', String(!allActive));
-        if (allActive) activeSources.delete(b.dataset.source);
-        else activeSources.add(b.dataset.source);
-      }
-    });
+sourceSelect.addEventListener('change', () => {
+  const val = sourceSelect.value;
+  activeSources.clear();
+  if (val === 'all') {
+    ['easypark','parkster','parkering_gbg','epark'].forEach(s => activeSources.add(s));
   } else {
-    btn.classList.toggle('active');
-    btn.setAttribute('aria-pressed', String(btn.classList.contains('active')));
-    if (btn.classList.contains('active')) activeSources.add(src);
-    else activeSources.delete(src);
+    activeSources.add(val);
   }
-  updateFilterToggleState();
   refreshMap();
-}
+});
 
-function toggleType(btn) {
-  const type = btn.dataset.type;
-  btn.classList.toggle('active');
-  btn.setAttribute('aria-pressed', String(btn.classList.contains('active')));
-  if (btn.classList.contains('active')) activeTypes.add(type);
-  else activeTypes.delete(type);
-  updateFilterToggleState();
+typeSelect.addEventListener('change', () => {
+  const val = typeSelect.value;
+  activeTypes.clear();
+  if (val === 'all') {
+    ['street','garage','lot','other'].forEach(t => activeTypes.add(t));
+  } else {
+    activeTypes.add(val);
+  }
   refreshMap();
-}
+});
 
 function toggleHideFree(btn) {
   hideFree = !hideFree;
