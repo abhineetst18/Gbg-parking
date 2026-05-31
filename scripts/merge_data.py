@@ -54,31 +54,31 @@ def parse_sek_per_hour(text: str) -> float | None:
 
     candidates = []
     
-    # "X kr per påbörjade N min" — generic minute-based
-    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*(?:per\s+)?(?:påbörjad\w*\s+)?(\d+)\s*min", tl):
-        amount = float(m.group(1))
+    # "X kr per påbörjade N min" — generic minute-based (supports decimal comma: "7,50 kr/15 min")
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?(?:påbörjad\w*\s+)?(\d+)\s*min", tl):
+        amount = float(m.group(1).replace(",", "."))
         minutes = int(m.group(2))
         if minutes > 0:
             candidates.append((m.start(), amount * 60 / minutes))
     
     # "X kr per påbörjade 45" (no "min", common truncation at line break)
-    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*(?:per\s+)?(?:påbörjad\w*\s+)(\d+)\s*$", tl, re.MULTILINE):
-        amount = float(m.group(1))
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?(?:påbörjad\w*\s+)(\d+)\s*$", tl, re.MULTILINE):
+        amount = float(m.group(1).replace(",", "."))
         minutes = int(m.group(2))
         if minutes > 0 and minutes in (15, 30, 45, 60):
             candidates.append((m.start(), amount * 60 / minutes))
     
     # "X kr / per påbörjad timme" or "X kr/påbörjad tim" (case-insensitive)
-    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*(?:per\s+)?påbörjad\w*\s*tim", tl):
-        candidates.append((m.start(), float(m.group(1))))
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?påbörjad\w*\s*tim", tl):
+        candidates.append((m.start(), float(m.group(1).replace(",", "."))))
     
     # "X kr/tim", "X kr/timme", "Xkr/Tim", "X kr / per timme" (case-insensitive)
-    for m in re.finditer(r"(\d+)\s*kr\s*/?\s*(?:per\s+)?tim", tl):
-        candidates.append((m.start(), float(m.group(1))))
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?tim", tl):
+        candidates.append((m.start(), float(m.group(1).replace(",", "."))))
     
     # "X kr/h" or "Xkr/h" (compact format)
-    for m in re.finditer(r"(\d+)\s*kr\s*/\s*h\b", tl):
-        candidates.append((m.start(), float(m.group(1))))
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/\s*h\b", tl):
+        candidates.append((m.start(), float(m.group(1).replace(",", "."))))
     
     if candidates:
         # Return the first occurrence (primary/daytime rate), rounded to 1 decimal
@@ -260,9 +260,14 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
         permit_req = bool(re.search(r"p-tillstånd|tillstånd\s+(?:erfordras|gäller|krävs)", all_lower))
         has_svc_fee = "serviceavgift" in all_lower
 
-        # Supplement with API-fetched tariff price if text parsing found nothing
+        # Supplement with API-fetched tariff price if text parsing found nothing.
+        # Skip tariff prices <= 2 kr/h — these are typically the standardized
+        # overnight "Övrig tid" rate (2 kr/h) or permit-only (0 kr/h), not the
+        # primary daytime rate that users care about.
         if price is None and ano in tariff_prices:
-            price = float(tariff_prices[ano])
+            tariff = float(tariff_prices[ano])
+            if tariff > 2:
+                price = tariff
         
         # Better price_text: first line of popup, or first meaningful line
         price_display = popup.split("\n")[0].strip() if popup else ""
@@ -344,21 +349,51 @@ def load_parkster() -> list[dict]:
         price = None
         price_text = ""
 
-        # Find the NORMAL fee (primary hourly rate)
-        normal_fees = [f for f in fees if f.get("typeOfRule") == "NORMAL" and f.get("amountPerHour", 0) > 0]
-        if normal_fees:
-            price = normal_fees[0]["amountPerHour"]
-            start = normal_fees[0].get("startTime")
-            end = normal_fees[0].get("endTime")
-            day_type = normal_fees[0].get("typeOfDay", "")
+        # Find the primary daytime hourly rate.
+        # Strategy: look for fees (NORMAL or CUSTOM) that cover standard daytime
+        # hours (8:00-17:00 = minutes 480-1020). Pick the highest rate among those.
+        # Fall back to amountForOtherTimes only if no fee covers daytime.
+        DAYTIME_START = 480   # 08:00
+        DAYTIME_END = 1020    # 17:00
+
+        daytime_fees = []
+        for f in fees:
+            amt = f.get("amountPerHour", 0)
+            if amt <= 0:
+                continue
+            start = f.get("startTime", 0)
+            end = f.get("endTime", 1440)
+            # Fee overlaps daytime if its range intersects [480, 1020]
+            if start < DAYTIME_END and end > DAYTIME_START:
+                daytime_fees.append(f)
+
+        if daytime_fees:
+            # Pick the highest daytime rate (primary/peak rate)
+            best_fee = max(daytime_fees, key=lambda f: f["amountPerHour"])
+            price = best_fee["amountPerHour"]
+            start = best_fee.get("startTime")
+            end = best_fee.get("endTime")
             time_range = ""
             if start is not None and end is not None:
                 sh, sm = divmod(start, 60)
                 eh, em = divmod(end, 60)
                 time_range = f" {sh:02d}:{sm:02d}-{eh:02d}:{em:02d}"
             price_text = f"{price:.0f} kr/tim{time_range}"
+        else:
+            # No fee covers daytime — check NORMAL fees as fallback
+            normal_fees = [f for f in fees if f.get("typeOfRule") == "NORMAL" and f.get("amountPerHour", 0) > 0]
+            if normal_fees:
+                price = normal_fees[0]["amountPerHour"]
+                start = normal_fees[0].get("startTime")
+                end = normal_fees[0].get("endTime")
+                time_range = ""
+                if start is not None and end is not None:
+                    sh, sm = divmod(start, 60)
+                    eh, em = divmod(end, 60)
+                    time_range = f" {sh:02d}:{sm:02d}-{eh:02d}:{em:02d}"
+                price_text = f"{price:.0f} kr/tim{time_range}"
 
-        # Fallback: amountForOtherTimes
+        # Fallback: amountForOtherTimes (only if no daytime/normal fee found)
         other_price = fz.get("amountForOtherTimes")
         if price is None and other_price and other_price > 0 and other_price < 99999999:
             price = other_price
@@ -695,19 +730,36 @@ def _merge_group(group: list[dict]) -> dict:
         if s.get("gbg_code"):
             area_codes.setdefault("parkering_gbg", s["gbg_code"])
 
-    # Best price: prefer lowest non-zero price (0 often means permit-only free
-    # zone merged with a nearby paid zone). Only use 0 if ALL sources are free.
+    # Best price: prefer authoritative sources (P.GBG first as city's official data,
+    # then EasyPark text-parsed, then others). Among same-tier sources, prefer highest
+    # non-zero price (lowest often = overnight/off-peak rate leaking through).
+    # Only use 0 if ALL sources report free.
     priced = [s for s in group if s["price_sek_hr"] is not None]
     paid = [s for s in priced if s["price_sek_hr"] > 0]
     if paid:
-        best_price = min(paid, key=lambda s: s["price_sek_hr"])
+        # Prefer P.GBG price (authoritative)
+        gbg_paid = [s for s in paid if s["source"] == "parkering_gbg"]
+        if gbg_paid:
+            best_price = max(gbg_paid, key=lambda s: s["price_sek_hr"])
+        else:
+            # Among other sources, prefer highest (lowest is often overnight leakage)
+            best_price = max(paid, key=lambda s: s["price_sek_hr"])
     elif priced:
         best_price = priced[0]  # all are 0
     else:
         best_price = primary
     
-    # Best price text: prefer longest (most detailed)
-    best_text = max(group, key=lambda s: len(s.get("price_text") or ""))
+    # Best price text: use the text from the SAME source that provided best_price.
+    # Fallback to longest text only if best_price source has no text.
+    best_text_str = best_price.get("price_text") or ""
+    if not best_text_str:
+        # Fallback: longest text from any source that has the same price
+        same_price = [s for s in group if s["price_sek_hr"] == best_price["price_sek_hr"]
+                      and s.get("price_text")]
+        if same_price:
+            best_text_str = max(same_price, key=lambda s: len(s["price_text"]))["price_text"]
+        else:
+            best_text_str = max(group, key=lambda s: len(s.get("price_text") or "")).get("price_text", "")
 
     # Best time limit
     time_limits = [s["time_limit"] for s in group if s.get("time_limit")]
@@ -751,7 +803,7 @@ def _merge_group(group: list[dict]) -> dict:
         "lat": primary["lat"],
         "lon": primary["lon"],
         "price_sek_hr": best_price["price_sek_hr"],
-        "price_text": best_text.get("price_text", ""),
+        "price_text": best_text_str,
         "time_limit": time_limit,
         "time_limited_free": tlf,
         "max_daily_sek": max_daily,
