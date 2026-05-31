@@ -547,19 +547,19 @@ body {
       <option value="price">Cheapest</option>
     </select>
     <select id="source-select">
-      <option value="all" selected>📱 All Apps</option>
-      <option value="easypark">EasyPark</option>
-      <option value="parkster">Parkster</option>
-      <option value="parkering_gbg">P.GBG</option>
-      <option value="epark">ePARK</option>
+      <option value="all" selected>All Apps</option>
+      <option value="easypark">EasyPark only</option>
+      <option value="parkster">Parkster only</option>
+      <option value="parkering_gbg">P.GBG only</option>
+      <option value="epark">ePARK only</option>
     </select>
     <select id="type-select">
       <option value="all" selected>All Types</option>
-      <option value="street">🛣️ Street</option>
-      <option value="garage">🏢 Garage</option>
-      <option value="lot">🅿️ Lot</option>
-      <option value="ev">⚡ EV</option>
-      <option value="other">Other</option>
+      <option value="street">🛣️ Street only</option>
+      <option value="garage">🏢 Garage only</option>
+      <option value="lot">🅿️ Lot only</option>
+      <option value="ev">⚡ EV only</option>
+      <option value="other">Other only</option>
     </select>
     <button class="btn hide-free" aria-pressed="false" id="hide-free-btn" onclick="toggleHideFree(this)"><span class="hide-free-icon">🚫 </span><span class="hide-free-label">Hide Free</span></button>
   </div>
@@ -1356,7 +1356,6 @@ function toggleHideFree(btn) {
   hideFree = !hideFree;
   btn.classList.toggle('active', hideFree);
   btn.setAttribute('aria-pressed', String(hideFree));
-  updateFilterToggleState();
   refreshMap();
 }
 
