@@ -150,11 +150,10 @@ body {
   overflow: hidden;
 }
 #controls .hide-free-label { display: inline; }
+.btn.hide-free.active { background: var(--green); border-color: var(--green); color: #fff; }
 @media (max-width: 420px) {
   #controls { max-height: 114px; }
   #controls .btn { padding: 6px 8px; font-size: 11px; }
-  #controls .hide-free .hide-free-icon { display: none; }
-  #controls .hide-free { padding: 6px 10px; }
 }
 .btn {
   background: var(--surface2);
@@ -547,21 +546,21 @@ body {
       <option value="price">Cheapest</option>
     </select>
     <select id="source-select">
-      <option value="all" selected>All Apps</option>
-      <option value="easypark">EasyPark only</option>
-      <option value="parkster">Parkster only</option>
-      <option value="parkering_gbg">P.GBG only</option>
-      <option value="epark">ePARK only</option>
+      <option value="all" selected>Apps</option>
+      <option value="easypark">EasyPark</option>
+      <option value="parkster">Parkster</option>
+      <option value="parkering_gbg">P.GBG</option>
+      <option value="epark">ePARK</option>
     </select>
     <select id="type-select">
-      <option value="all" selected>All Types</option>
-      <option value="street">🛣️ Street only</option>
-      <option value="garage">🏢 Garage only</option>
-      <option value="lot">🅿️ Lot only</option>
-      <option value="ev">⚡ EV only</option>
-      <option value="other">Other only</option>
+      <option value="all" selected>Type</option>
+      <option value="street">Street</option>
+      <option value="garage">Garage</option>
+      <option value="lot">Lot</option>
+      <option value="ev">EV</option>
+      <option value="other">Other</option>
     </select>
-    <button class="btn hide-free" aria-pressed="false" id="hide-free-btn" onclick="toggleHideFree(this)"><span class="hide-free-icon">🚫 </span><span class="hide-free-label">Hide Free</span></button>
+    <button class="btn hide-free active" aria-pressed="true" id="hide-free-btn" onclick="toggleHideFree(this)">Hide Free</button>
   </div>
   <div id="radius-row">
     <button class="radius-btn" onclick="adjustRadius(-1)" aria-label="Decrease radius">−</button>
@@ -585,7 +584,7 @@ let map, userMarker, clusterGroup;
 let markerById = new Map();
 let activeSources = new Set(['easypark', 'parkster', 'parkering_gbg', 'epark']);
 let activeTypes = new Set(['street', 'garage', 'lot', 'other']);
-let hideFree = false;
+let hideFree = true;
 let sortMode = 'distance';
 let searchRadius = 3000; // metres, adjustable
 let lang = 'sv'; // 'sv' or 'en'
