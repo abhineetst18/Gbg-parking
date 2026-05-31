@@ -359,7 +359,7 @@ def load_parkster() -> list[dict]:
         daytime_fees = []
         for f in fees:
             amt = f.get("amountPerHour", 0)
-            if amt <= 0:
+            if amt <= 0 or amt >= 500:  # skip sentinels (9999 = private)
                 continue
             start = f.get("startTime", 0)
             end = f.get("endTime", 1440)
@@ -395,7 +395,7 @@ def load_parkster() -> list[dict]:
 
         # Fallback: amountForOtherTimes (only if no daytime/normal fee found)
         other_price = fz.get("amountForOtherTimes")
-        if price is None and other_price and other_price > 0 and other_price < 99999999:
+        if price is None and other_price and other_price > 0 and other_price < 500:
             price = other_price
 
         owner = z.get("owner", {}) or {}
@@ -405,7 +405,8 @@ def load_parkster() -> list[dict]:
             "name": z.get("name", f"Parkster {zid}"),
             "lat": round(float(lat), 6),
             "lon": round(float(lon), 6),
-            "price_sek_hr": price if price and price < 99999999 else None,
+            # Prices >= 500 kr/h are sentinel values (9999 = private/permit-only)
+            "price_sek_hr": price if price and price < 500 else None,
             "price_text": price_text,
             "time_limit": None,
             "max_daily_sek": None,
