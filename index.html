@@ -168,11 +168,11 @@ body {
 .btn:hover { background: rgba(255,255,255,0.12); }
 .btn:active { transform: scale(0.95); }
 .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.locate { background: var(--green); border-color: var(--green); color: #fff; }
+.btn.locate.active { background: var(--green); border-color: var(--green); color: #fff; }
 [data-theme="light"] .btn { border-color: rgba(0,0,0,0.1); }
 [data-theme="light"] .btn:hover { background: rgba(0,0,0,0.06); }
 [data-theme="light"] .btn.active { background: var(--accent); color: #fff; }
-[data-theme="light"] .btn.locate { background: var(--green); color: #fff; }
+[data-theme="light"] .btn.locate.active { background: var(--green); color: #fff; }
 #sort-select, #source-select, #type-select {
   background: var(--surface2);
   border: 1px solid rgba(255,255,255,0.1);
@@ -558,7 +558,7 @@ body {
       <option value="ev">EV</option>
       <option value="other">Other</option>
     </select>
-    <button class="btn hide-free active" aria-pressed="true" id="hide-free-btn" onclick="toggleHideFree(this)">Hide Free</button>
+    <button class="btn hide-free active" aria-pressed="true" id="hide-free-btn" onclick="toggleHideFree(this)">Show Free</button>
   </div>
   <div id="radius-row">
     <button class="radius-btn" onclick="adjustRadius(-1)" aria-label="Decrease radius">−</button>
@@ -1139,6 +1139,7 @@ function setUserLocation(lat, lon) {
   }).addTo(map);
   userMarker.bindPopup('You are here').openPopup();
   map.flyTo([lat, lon], 16, { duration: 0.8 });
+  document.querySelector('.btn.locate').classList.add('active');
   document.getElementById('radius-row').classList.add('visible');
   updateRadiusCircle();
   refreshMap();
@@ -1353,6 +1354,7 @@ function toggleHideFree(btn) {
   hideFree = !hideFree;
   btn.classList.toggle('active', hideFree);
   btn.setAttribute('aria-pressed', String(hideFree));
+  btn.textContent = hideFree ? 'Show Free' : 'Hide Free';
   refreshMap();
 }
 
