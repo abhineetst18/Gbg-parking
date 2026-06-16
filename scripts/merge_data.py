@@ -55,21 +55,25 @@ def parse_sek_per_hour(text: str) -> float | None:
     candidates = []
     
     # "X kr per påbörjade N min" — generic minute-based (supports decimal comma: "7,50 kr/15 min")
-    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?(?:påbörjad\w*\s+)?(\d+)\s*min", tl):
+    # WHY: "på\s*börja" tolerates a data-entry variant with an internal space ("på började").
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?(?:på\s*börja\w*\s+)?(\d+)\s*min", tl):
         amount = float(m.group(1).replace(",", "."))
         minutes = int(m.group(2))
         if minutes > 0:
             candidates.append((m.start(), amount * 60 / minutes))
     
     # "X kr per påbörjade 45" (no "min", common truncation at line break)
-    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?(?:påbörjad\w*\s+)(\d+)\s*$", tl, re.MULTILINE):
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?(?:på\s*börja\w*\s+)(\d+)\s*$", tl, re.MULTILINE):
         amount = float(m.group(1).replace(",", "."))
         minutes = int(m.group(2))
         if minutes > 0 and minutes in (15, 30, 45, 60):
             candidates.append((m.start(), amount * 60 / minutes))
     
     # "X kr / per påbörjad timme" or "X kr/påbörjad tim" (case-insensitive)
-    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?påbörjad\w*\s*tim", tl):
+    # NOTE: unit accepts "tim" (timme/tim) OR "h" (hour abbreviation, e.g. ePARK
+    # "6kr/per påbörjad h"). The \b after "h" prevents matching stray letters such
+    # as the "h" in "helgfri".
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?på\s*börja\w*\s*(?:tim|h\b)", tl):
         candidates.append((m.start(), float(m.group(1).replace(",", "."))))
     
     # "X kr/tim", "X kr/timme", "Xkr/Tim", "X kr / per timme" (case-insensitive)
