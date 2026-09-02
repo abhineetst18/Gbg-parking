@@ -93,6 +93,8 @@ body {
 /* Map */
 #map {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   z-index: 1;
 }
 
@@ -186,6 +188,8 @@ body {
 
 /* Results list */
 #results {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 0 12px 12px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
@@ -448,7 +452,33 @@ body {
 }
 
 @media (min-width: 768px) {
-  #panel { max-height: 35dvh; }
+  body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  #header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  #map {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  #panel {
+    grid-column: 2;
+    grid-row: 2;
+    width: 360px;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    border-top: none;
+    border-left: 1px solid var(--border);
+  }
+  #panel.collapsed { max-height: none; }
+  #panel-header { display: none; }
+  #controls { padding-top: 12px; }
+  #results { padding-bottom: 12px; }
   #location-input { max-width: none; }
 }
 .update-toast {
@@ -529,7 +559,7 @@ body {
 
 <div id="map"></div>
 
-<div id="panel">
+<div id="panel" role="region" aria-label="Parking search and results">
   <button id="panel-header" aria-expanded="true" aria-controls="controls" aria-label="Toggle panel"><div class="handle"></div><span class="chevron">▾</span></button>
   <div id="controls">
     <button class="btn locate" onclick="locateMe()" aria-label="Use my location">📍 My Location</button>
@@ -1096,9 +1126,10 @@ function refreshMap() {
 }
 
 function flyTo(lat, lon, id) {
-  // Collapse panel so map is visible
   const panel = document.getElementById('panel');
-  if (!panel.classList.contains('collapsed')) {
+  const shouldCollapsePanel = window.matchMedia('(max-width: 767px)').matches
+    && !panel.classList.contains('collapsed');
+  if (shouldCollapsePanel) {
     panel.classList.add('collapsed');
     document.getElementById('panel-header').setAttribute('aria-expanded', 'false');
     setTimeout(() => map.invalidateSize(), 350);
@@ -1106,16 +1137,15 @@ function flyTo(lat, lon, id) {
 
   const marker = markerById.get(id);
   if (marker) {
-    // Small delay to let panel collapse and map resize
     setTimeout(() => {
       clusterGroup.zoomToShowLayer(marker, () => {
         marker.openPopup();
       });
-    }, 400);
+    }, shouldCollapsePanel ? 400 : 0);
   } else {
     setTimeout(() => {
       map.flyTo([lat, lon], 17, { duration: 0.5 });
-    }, 400);
+    }, shouldCollapsePanel ? 400 : 0);
   }
 }
 

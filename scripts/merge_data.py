@@ -3,7 +3,6 @@
 import json
 import os
 import re
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,7 +30,7 @@ PGBG_CORRECTIONS = [
 
 def parse_sek_per_hour(text: str) -> float | None:
     """Extract SEK/hour from Swedish pricing text. Picks the primary (first/daytime) rate.
-    
+
     Handles patterns (case-insensitive):
       X kr/15 min, X kr per påbörjade 15 min  → X*4
       X kr/30 min, X kr per påbörjade 30 min  → X*2
@@ -41,19 +40,14 @@ def parse_sek_per_hour(text: str) -> float | None:
       X kr/tim, X kr/timme, Xkr/Tim           → X
       X kr/h, Xkr/h                           → X
       0 kr/h (free)                            → 0
-      Gratis / avgiftsfri                      → 0
+      Gratis / avgiftsfri                      → 0 (only if no paid rate found)
     """
     if not text:
         return None
-    t = text  # keep original case for position matching
     tl = text.lower()
 
-    # Explicit free parking
-    if re.search(r"\bgratis\b|\bavgiftsfri", tl):
-        return 0.0
-
     candidates = []
-    
+
     # "X kr per påbörjade N min" — generic minute-based (supports decimal comma: "7,50 kr/15 min")
     # WHY: "på\s*börja" tolerates a data-entry variant with an internal space ("på började").
     for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?(?:på\s*börja\w*\s+)?(\d+)\s*min", tl):
@@ -61,33 +55,38 @@ def parse_sek_per_hour(text: str) -> float | None:
         minutes = int(m.group(2))
         if minutes > 0:
             candidates.append((m.start(), amount * 60 / minutes))
-    
+
     # "X kr per påbörjade 45" (no "min", common truncation at line break)
     for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?(?:på\s*börja\w*\s+)(\d+)\s*$", tl, re.MULTILINE):
         amount = float(m.group(1).replace(",", "."))
         minutes = int(m.group(2))
         if minutes > 0 and minutes in (15, 30, 45, 60):
             candidates.append((m.start(), amount * 60 / minutes))
-    
+
     # "X kr / per påbörjad timme" or "X kr/påbörjad tim" (case-insensitive)
     # NOTE: unit accepts "tim" (timme/tim) OR "h" (hour abbreviation, e.g. ePARK
     # "6kr/per påbörjad h"). The \b after "h" prevents matching stray letters such
     # as the "h" in "helgfri".
     for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?på\s*börja\w*\s*(?:tim|h\b)", tl):
         candidates.append((m.start(), float(m.group(1).replace(",", "."))))
-    
+
     # "X kr/tim", "X kr/timme", "Xkr/Tim", "X kr / per timme" (case-insensitive)
     for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/?\s*(?:per\s+)?tim", tl):
         candidates.append((m.start(), float(m.group(1).replace(",", "."))))
-    
+
     # "X kr/h" or "Xkr/h" (compact format)
     for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*kr\s*/\s*h\b", tl):
         candidates.append((m.start(), float(m.group(1).replace(",", "."))))
-    
+
     if candidates:
         # Return the first occurrence (primary/daytime rate), rounded to 1 decimal
         candidates.sort(key=lambda c: c[0])
         return round(candidates[0][1], 1)
+
+    # No paid rate found; check for explicit free parking only
+    if re.search(r"\bgratis\b|\bavgiftsfri", tl):
+        return 0.0
+
     return None
 
 
@@ -110,17 +109,18 @@ def parse_max_daily(text: str) -> float | None:
 
 
 def parse_season(text: str) -> tuple[str, str] | None:
-    """Extract seasonal date range from text like 'Avgift 1/5-30/9' or 'Avgift 1/6 till 30/9'.
-    
+    """Extract seasonal date range from text like 'Avgift 1/5-30/9' or 'Taxa 1/6-31/8'.
+
     Returns (start, end) as 'MM-DD' strings, or None if not seasonal.
+    Recognizes both 'Avgift' and 'Taxa' prefixes with '-' or 'till' separators.
     """
     if not text:
         return None
     tl = text.lower()
-    # Pattern: "avgift D/M-D/M" or "avgift D/M till D/M"
-    m = re.search(r"avgift\s+(\d{1,2})/(\d{1,2})\s*[-–]\s*(\d{1,2})/(\d{1,2})", tl)
+    # Pattern: "(avgift|taxa) D/M-D/M" or "(avgift|taxa) D/M till D/M"
+    m = re.search(r"(?:avgift|taxa)\s+(\d{1,2})/(\d{1,2})\s*[-–]\s*(\d{1,2})/(\d{1,2})", tl)
     if not m:
-        m = re.search(r"avgift\s+(\d{1,2})/(\d{1,2})\s+till\s+(\d{1,2})/(\d{1,2})", tl)
+        m = re.search(r"(?:avgift|taxa)\s+(\d{1,2})/(\d{1,2})\s+till\s+(\d{1,2})/(\d{1,2})", tl)
     if m:
         sd, sm, ed, em = m.group(1), m.group(2), m.group(3), m.group(4)
         return (f"{int(sm):02d}-{int(sd):02d}", f"{int(em):02d}-{int(ed):02d}")
@@ -147,16 +147,24 @@ def parse_time_limit(text: str) -> str | None:
     m = re.search(r"maxtid\s+(\d+)\s*tim", tl)
     if m:
         return f"{m.group(1)}h"
-    # "24 tim" or "2 timmar" (time limit, not price)
-    m = re.search(r"(\d+)\s*tim(?:mar|me)?\b(?!\s*/?\s*kr)", text)
-    if m:
-        return f"{m.group(1)}h"
+    # A bare duration can be a limit, but not when that duration is attached to free-period wording.
+    for match in re.finditer(r"(\d+)\s*tim(?:mar|me)?\b(?!\s*/?\s*kr)", tl):
+        before = tl[max(0, match.start() - 50):match.start()]
+        after = tl[match.end():match.end() + 20]
+        free_before = re.search(
+            r"(?:avgiftsfri\w*|fri\w*|gratis)\s+(?:parkering\s+)?(?:de\s+)?(?:första\s+)?$",
+            before,
+        )
+        free_after = re.match(r"\s+(?:avgiftsfri\w*|fri\w*|gratis)\b", after)
+        if free_before or free_after:
+            continue
+        return f"{match.group(1)}h"
     # "Inom zonen finns tidsbegränsade parkeringar 2tim"
-    m = re.search(r"tidsbegräns\w*\s*(?:parkering\w*)?\s*(\d+)\s*tim", text)
+    m = re.search(r"tidsbegräns\w*\s*(?:parkering\w*)?\s*(\d+)\s*tim", tl)
     if m:
         return f"{m.group(1)}h"
     # "10min" or "10 min"
-    m = re.search(r"tidsbegräns\w*\s*(?:parkering\w*)?\s*(\d+)\s*min", text)
+    m = re.search(r"tidsbegräns\w*\s*(?:parkering\w*)?\s*(\d+)\s*min", tl)
     if m:
         return f"{m.group(1)}min"
     return None
@@ -164,30 +172,63 @@ def parse_time_limit(text: str) -> str | None:
 
 def parse_free_minutes(text: str) -> int | None:
     """Extract initial free parking period from text like 'Fri parkering 2 tim' or '1 timma fri'.
-    
+
     Returns the free period in minutes, or None if no free period.
     """
     if not text:
         return None
     tl = text.lower()
-    # "Fri parkering X tim" or "Fritt X tim"
-    m = re.search(r"fri\w*\s+(?:parkering\s+)?(\d+(?:[.,]\d+)?)\s*(?:tim|h)\b", tl)
-    if m:
-        return int(float(m.group(1).replace(",", ".")) * 60)
-    # "X tim fri parkering" or "X timma fri"
-    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:tim\w*|h)\s+fri", tl)
-    if m:
-        return int(float(m.group(1).replace(",", ".")) * 60)
-    # "Fri parkering X min"
-    m = re.search(r"fri\w*\s+(?:parkering\s+)?(\d+)\s*min", tl)
-    if m:
-        return int(m.group(1))
-    # "X min fri"
-    m = re.search(r"(\d+)\s*min\s+fri", tl)
-    if m:
-        return int(m.group(1))
+    patterns = (
+        r"(?:avgiftsfri\w*|fri\w*|gratis)\s+(?:parkering\s+)?(?:de\s+)?(?:första\s+)?"
+        r"(\d+(?:[.,]\d+)?)\s*(tim\w*|h|min)\b",
+        r"(?:första\s+)?(\d+(?:[.,]\d+)?)\s*(tim\w*|h|min)\s+"
+        r"(?:fri\w*|gratis)\b",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, tl)
+        if match:
+            duration = float(match.group(1).replace(",", "."))
+            return int(duration * 60) if match.group(2).startswith(("tim", "h")) else int(duration)
     return None
 
+
+def extract_rate_bearing_line(text: str, parsed_price: float | None) -> str:
+    """Extract the line containing the actual rate, or first meaningful line.
+
+    For multiline tariff text where line 1 is a schedule (e.g., "Måndag – Fredag 15:00 – 22:00")
+    and line 2 has the rate ("20 kr per påbörjade 45 min"), this returns line 2.
+
+    Returns:
+        The line containing "kr" closest to the parsed price, or the first non-empty line.
+        Result is bounded to <=150 chars to avoid unbounded storage.
+    """
+    if not text:
+        return ""
+
+    lines = [ln.strip() for ln in text.split("\n") if ln.strip()]
+    if not lines:
+        return ""
+
+    # If only one line, return it (bounded)
+    if len(lines) == 1:
+        return lines[0][:150]
+
+    # Find lines containing price patterns (digit + "kr", not just "kr" substring)
+    kr_lines = [ln for ln in lines if re.search(r"\d+(?:[.,]\d+)?\s*kr", ln, re.IGNORECASE)]
+    if not kr_lines:
+        # No price text found; return first line
+        return lines[0][:150]
+
+    # If we have a parsed price, try to find the line whose text would produce it
+    if parsed_price is not None:
+        # Check each kr-bearing line by re-parsing it individually
+        for ln in kr_lines:
+            ln_price = parse_sek_per_hour(ln)
+            if ln_price is not None and abs(ln_price - parsed_price) < 0.2:
+                return ln[:150]
+
+    # Fallback: return the first line with "digit kr"
+    return kr_lines[0][:150]
 
 
 def classify_type(area_type: str) -> str:
@@ -208,7 +249,7 @@ def classify_type(area_type: str) -> str:
 
 def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
     """Load EasyPark areas from complete + summary data.
-    
+
     Args:
         gbg_codes: Set of known Parkering Göteborg parking_code strings,
                    used to cross-reference EasyPark spots that are actually
@@ -249,12 +290,11 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
         popup = detail.get("popUpMessage", "") or ""
         free_text = detail.get("freeTextTariffInfo", "") or ""
         price_info = detail.get("priceInfo") or ""
-        # Combine all text sources for parsing
-        all_text = popup
-        if not parse_sek_per_hour(popup):
-            # Fallback to freeTextTariffInfo then priceInfo
-            all_text = f"{popup} {free_text} {price_info}".strip()
-        
+
+        # Combine all text sources consistently for parsing (source priority order)
+        # Use newline separator to preserve line-based patterns (schedule vs rate lines)
+        all_text = "\n".join(filter(None, [popup, free_text, price_info]))
+
         price = parse_sek_per_hour(all_text)
         time_limit = parse_time_limit(all_text)
         max_daily = parse_max_daily(all_text)
@@ -272,11 +312,9 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
             tariff = float(tariff_prices[ano])
             if tariff > 2:
                 price = tariff
-        
-        # Better price_text: first line of popup, or first meaningful line
-        price_display = popup.split("\n")[0].strip() if popup else ""
-        if not price_display and free_text:
-            price_display = free_text.split("\n")[0].strip()
+
+        # Extract the rate-bearing line for display, not just the first line
+        price_display = extract_rate_bearing_line(all_text, price)
 
         area_type = detail.get("areaType", "")
         custom_type = record.get("tileData", {}).get("customAreaType", "")
@@ -525,15 +563,16 @@ def load_parkering_gbg() -> list[dict]:
 
 def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
     """Load ePARK zones from pre-fetched data.
-    
+
     ePARK zone detail has NO coordinates, so we resolve lat/lon by:
     1. Matching public_area_code → P.GBG spot coordinates
     2. Geocoding remaining via Nominatim (street name + Göteborg)
-    
+
     Args:
         gbg_spots: List of already-loaded P.GBG spots for coordinate lookup.
     """
     import time
+
     import requests as _req
 
     path = DATA_DIR / "epark_gothenburg_zones.json"
@@ -706,7 +745,7 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
 
 def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Distance in metres between two points."""
-    from math import radians, sin, cos, sqrt, atan2
+    from math import atan2, cos, radians, sin, sqrt
     R = 6371000
     dlat = radians(lat2 - lat1)
     dlon = radians(lon2 - lon1)
@@ -753,26 +792,21 @@ def _merge_group(group: list[dict]) -> dict:
         best_price = priced[0]  # all are 0
     else:
         best_price = primary
-    
-    # Best price text: use the text from the SAME source that provided best_price.
-    # Fallback to longest text only if best_price source has no text.
+
+    # Tariff metadata comes from one source. A same-rate source may provide missing text,
+    # but text from a different rate would contradict the selected numeric price.
+    tariff_source = best_price
     best_text_str = best_price.get("price_text") or ""
     if not best_text_str:
-        # Fallback: longest text from any source that has the same price
         same_price = [s for s in group if s["price_sek_hr"] == best_price["price_sek_hr"]
                       and s.get("price_text")]
         if same_price:
-            best_text_str = max(same_price, key=lambda s: len(s["price_text"]))["price_text"]
-        else:
-            best_text_str = max(group, key=lambda s: len(s.get("price_text") or "")).get("price_text", "")
+            tariff_source = max(same_price, key=lambda s: len(s["price_text"]))
+            best_text_str = tariff_source["price_text"]
 
     # Best time limit
     time_limits = [s["time_limit"] for s in group if s.get("time_limit")]
     time_limit = time_limits[0] if time_limits else None
-
-    # Max daily
-    max_dailies = [s["max_daily_sek"] for s in group if s.get("max_daily_sek")]
-    max_daily = min(max_dailies) if max_dailies else None
 
     # Time-limited free flag
     tlf = any(s.get("time_limited_free") for s in group)
@@ -789,8 +823,6 @@ def _merge_group(group: list[dict]) -> dict:
         if g.get("has_charging"):
             has_charging = True
 
-    # Use the best name (prefer without zone prefix if available)
-    names = [s["name"] for s in group]
     # Prefer GBG name (no zone prefix), else shortest EP name
     best_name = primary["name"]
     for s in group:
@@ -811,10 +843,10 @@ def _merge_group(group: list[dict]) -> dict:
         "price_text": best_text_str,
         "time_limit": time_limit,
         "time_limited_free": tlf,
-        "max_daily_sek": max_daily,
-        "season_start": next((s.get("season_start") for s in group if s.get("season_start")), None),
-        "season_end": next((s.get("season_end") for s in group if s.get("season_end")), None),
-        "free_minutes": next((s.get("free_minutes") for s in group if s.get("free_minutes")), None),
+        "max_daily_sek": tariff_source.get("max_daily_sek"),
+        "season_start": tariff_source.get("season_start"),
+        "season_end": tariff_source.get("season_end"),
+        "free_minutes": tariff_source.get("free_minutes"),
         "permit_required": any(s.get("permit_required") for s in group),
         "service_fee": any(s.get("service_fee") for s in group),
         "area_codes": area_codes,
@@ -832,7 +864,7 @@ def _merge_group(group: list[dict]) -> dict:
 
 def deduplicate(spots: list[dict]) -> list[dict]:
     """Merge spots from different sources that represent the same physical location.
-    
+
     Matching strategies (in order):
     1. EasyPark gbg_code → GBG area_code (exact code cross-reference)
     2. Parkster area_code → GBG area_code (zone codes match)
@@ -971,6 +1003,20 @@ def deduplicate(spots: list[dict]) -> list[dict]:
     return result
 
 
+def find_price_text_mismatches(spots: list[dict]) -> list[tuple[str, float, float]]:
+    """Return records whose displayed tariff parses to a different hourly rate."""
+    mismatches = []
+    for spot in spots:
+        stored_price = spot.get("price_sek_hr")
+        price_text = spot.get("price_text")
+        if stored_price is None or not isinstance(price_text, str) or not price_text:
+            continue
+        parsed_price = parse_sek_per_hour(price_text)
+        if parsed_price is not None and abs(float(stored_price) - parsed_price) >= 0.2:
+            mismatches.append((str(spot.get("id", "?")), float(stored_price), parsed_price))
+    return mismatches
+
+
 def merge_all() -> dict:
     """Merge all sources into unified dataset."""
     print("Loading Parkering Göteborg...")
@@ -1017,6 +1063,16 @@ def merge_all() -> dict:
     for a in deduped:
         types[a["type"]] = types.get(a["type"], 0) + 1
     print(f"  Types: {types}")
+
+    mismatches = find_price_text_mismatches(deduped)
+    if mismatches:
+        sample = ", ".join(
+            f"{spot_id} ({stored:g} vs {parsed:g})"
+            for spot_id, stored, parsed in mismatches[:5]
+        )
+        raise ValueError(
+            f"Refusing to publish {len(mismatches)} price/text mismatch(es): {sample}"
+        )
 
     return {
         "generated": datetime.now(timezone.utc).isoformat(),

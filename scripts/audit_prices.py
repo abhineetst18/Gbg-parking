@@ -17,9 +17,14 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from merge_data import parse_sek_per_hour  # noqa: E402
+from merge_data import (  # noqa: E402
+    find_price_text_mismatches,
+    parse_free_minutes,
+    parse_sek_per_hour,
+)
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+ROOT_DIR = Path(__file__).resolve().parent.parent
 
 # Any number followed by kr somewhere in the text (used to detect "has a price")
 KR_NUMBER = re.compile(r"(\d+(?:[.,]\d+)?)\s*kr", re.IGNORECASE)
@@ -65,7 +70,10 @@ def classify(text: str) -> tuple[str, float | None]:
 
 
 def extract_easypark() -> list[tuple[str, str]]:
-    """Return (label, pricing_text) tuples from EasyPark complete data."""
+    """Return (label, pricing_text) tuples from EasyPark complete data.
+
+    Uses the same text combination as merge_data.py for consistency.
+    """
     path = DATA_DIR / "easypark_gothenburg_complete.json"
     if not path.exists():
         return []
@@ -76,7 +84,8 @@ def extract_easypark() -> list[tuple[str, str]]:
         popup = d.get("popUpMessage") or ""
         free_text = d.get("freeTextTariffInfo") or ""
         price_info = d.get("priceInfo") or ""
-        text = popup or f"{free_text} {price_info}".strip()
+        # Combine all fields consistently (matches merge_data.py)
+        text = "\n".join(filter(None, [popup, free_text, price_info]))
         name = d.get("areaName", ano)
         if text.strip():
             out.append((f"EP {name} ({d.get('areaNo', ano)})", text))
@@ -127,6 +136,19 @@ def extract_epark() -> list[tuple[str, str]]:
         if text:
             out.append((f"EK {name}", text))
     return out
+
+
+def extract_generated_easypark() -> list[dict]:
+    """Return public output records that include EasyPark as a source."""
+    path = ROOT_DIR / "parking_data.json"
+    if not path.exists():
+        return []
+    dataset = json.loads(path.read_text())
+    return [
+        spot
+        for spot in dataset.get("spots", [])
+        if "easypark" in spot.get("sources", [])
+    ]
 
 
 def normalize_pattern(text: str) -> str:
@@ -185,6 +207,25 @@ def main() -> None:
     for cat, n in pg_cats.most_common():
         print(f"  {cat:16s} {n}")
     print(f"  Parser-vs-stored disagreements: {len(pg_disagree)}")
+
+    generated_easypark = extract_generated_easypark()
+    generated_mismatches = find_price_text_mismatches(generated_easypark)
+    generated_free_mismatches = []
+    for spot in generated_easypark:
+        parsed_free = parse_free_minutes(spot.get("price_text", ""))
+        if parsed_free is not None and spot.get("free_minutes") != parsed_free:
+            generated_free_mismatches.append(
+                (str(spot.get("id", "?")), spot.get("free_minutes"), parsed_free)
+            )
+    generated_by_id = {str(spot.get("id", "?")): spot for spot in generated_easypark}
+    print(f"\n=== Generated EasyPark output ({len(generated_easypark)} spots) ===")
+    print(f"  Stored-vs-displayed disagreements: {len(generated_mismatches)}")
+    for spot_id, stored, parsed in generated_mismatches[:20]:
+        text = generated_by_id[spot_id].get("price_text", "").replace("\n", " / ")[:140]
+        print(f"  {spot_id}: stored={stored:g} displayed={parsed:g} | {text!r}")
+    print(f"  Introductory-free disagreements: {len(generated_free_mismatches)}")
+    for spot_id, stored, parsed in generated_free_mismatches[:20]:
+        print(f"  {spot_id}: stored={stored!r} displayed={parsed} min")
 
     print("\n" + "=" * 60)
     print("GRAND TOTAL")
