@@ -84,9 +84,14 @@
   - **Responsive panel:** below 768px, controls and results remain a collapsible bottom panel; at 768px and above, they become a fixed 360px right sidebar while the map fills the remaining width
 
 - `sw.js` — Service worker
-  - **Cache strategy:** Network-first for `parking_data.json` (cache name: `parking-gbg-v37`)
+  - **Cache strategy:** Network-first for `parking_data.json` (cache name: `parking-gbg-v38`); CARTO/Esri tiles use a 500-entry browser cache with per-entry metadata and a 30-day maximum age
   - **Cache invalidation trigger:** Bump `CACHE_NAME` version when data changes
   - **Dependencies:** Production deployment requires coordinated sw.js version bump + data refresh
+
+- `config.js` — Secret-free local runtime configuration
+  - **Production mutation trigger:** `.github/workflows/deploy-pages.yml` writes the staged copy from the `CARTO_API_KEY` repository secret
+  - **Consumers:** `index.html` appends the URL-encoded key to CARTO light/dark tile requests
+  - **Security boundary:** The tracked file remains empty; the deployed browser key is public by design and must be domain-restricted in CARTO
 
 ### Static Assets
 - `manifest.json` — PWA manifest (app name, icons, theme)
@@ -100,7 +105,7 @@
 - No API keys or secrets committed to repo
 
 ### Current Data Staleness
-- Production `parking_data.json` is based on the 2026-06-16 snapshot with the bounded 2026-08-31 four-row correction above; `sw.js` is at `parking-gbg-v37`
+- Production `parking_data.json` is based on the 2026-06-16 snapshot with the bounded 2026-08-31 four-row correction above; `sw.js` is at `parking-gbg-v38`
 - **No full merge/regeneration is allowed yet:** the current canonical EasyPark file contains only 301 live records versus 1,893 EasyPark source records in the historical published snapshot. Wait until a sufficiently complete refresh passes the ≥99% resolved-coverage promotion gate
 - The in-flight EasyPark refresh is a checkpoint-v1 state with live results plus raw query-form 404 failures that have not yet been probed against the internal-id endpoint; those stay unresolved until a probe runs
 - EasyPark tariffs change periodically; refresh is manual and quota-bound, never automated

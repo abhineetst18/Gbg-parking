@@ -602,6 +602,7 @@ body {
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin=""></script>
+<script src="./config.js"></script>
 <script>
 'use strict';
 
@@ -831,15 +832,17 @@ map = L.map('map', {
 });
 L.control.zoom({ position: 'topright' }).addTo(map);
 L.control.attribution({ position: 'bottomright', prefix: false })
-  .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OSM</a>')
+  .addAttribution('© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · © <a href="https://carto.com/attributions">CARTO</a>')
   .addTo(map);
 
 // Tile layers
-const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+const cartoApiKey = window.PARKING_CONFIG?.cartoApiKey?.trim() || '';
+const cartoKeyQuery = cartoApiKey ? `?key=${encodeURIComponent(cartoApiKey)}` : '';
+const darkLayer = L.tileLayer(`https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png${cartoKeyQuery}`, {
   maxZoom: 19,
   subdomains: 'abcd',
 });
-const lightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+const lightLayer = L.tileLayer(`https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png${cartoKeyQuery}`, {
   maxZoom: 19,
   subdomains: 'abcd',
 });

@@ -1,9 +1,12 @@
-const CACHE_NAME = 'parking-gbg-v37';
-const TILE_CACHE = 'parking-gbg-tiles-v1';
+const CACHE_NAME = 'parking-gbg-v38';
+const TILE_CACHE = 'parking-gbg-tiles-v2';
+const TILE_METADATA_CACHE = 'parking-gbg-tile-metadata-v1';
 const MAX_TILES = 500;
+const TILE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const ASSETS = [
   './',
   './index.html',
+  './config.js',
   './parking_data.json',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
@@ -22,20 +25,62 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME && k !== TILE_CACHE).map(k => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter(k => ![CACHE_NAME, TILE_CACHE, TILE_METADATA_CACHE].includes(k))
+          .map(k => caches.delete(k))
+      )
     )
   );
   self.clients.claim();
 });
 
-function trimCache(cacheName, maxItems) {
-  caches.open(cacheName).then(cache =>
-    cache.keys().then(keys => {
-      if (keys.length > maxItems) {
-        cache.delete(keys[0]).then(() => trimCache(cacheName, maxItems));
-      }
-    })
-  );
+async function trimTileCache() {
+  const [tileCache, metadataCache] = await Promise.all([
+    caches.open(TILE_CACHE),
+    caches.open(TILE_METADATA_CACHE),
+  ]);
+  const keys = await tileCache.keys();
+  const excessKeys = keys.slice(0, Math.max(0, keys.length - MAX_TILES));
+  await Promise.all(excessKeys.flatMap(request => [
+    tileCache.delete(request),
+    metadataCache.delete(request),
+  ]));
+}
+
+async function getFreshTile(request) {
+  const [tileCache, metadataCache] = await Promise.all([
+    caches.open(TILE_CACHE),
+    caches.open(TILE_METADATA_CACHE),
+  ]);
+  const cached = await tileCache.match(request);
+  if (!cached) {
+    await metadataCache.delete(request);
+    return null;
+  }
+
+  const metadata = await metadataCache.match(request);
+  const cachedAt = metadata ? Number(await metadata.text()) : NaN;
+  if (!Number.isFinite(cachedAt) || Date.now() - cachedAt >= TILE_MAX_AGE_MS) {
+    await Promise.all([
+      tileCache.delete(request),
+      metadataCache.delete(request),
+    ]);
+    return null;
+  }
+  return cached;
+}
+
+async function cacheTile(request, response) {
+  const [tileCache, metadataCache] = await Promise.all([
+    caches.open(TILE_CACHE),
+    caches.open(TILE_METADATA_CACHE),
+  ]);
+  await Promise.all([
+    tileCache.put(request, response),
+    metadataCache.put(request, new Response(String(Date.now()))),
+  ]);
+  await trimTileCache();
 }
 
 self.addEventListener('fetch', event => {
@@ -57,20 +102,22 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache map tiles (CartoDB + Esri satellite) — separate bounded cache
+  // Cache map tiles on the end user's device for at most 30 days.
   if (url.includes('basemaps.cartocdn.com') || url.includes('arcgisonline.com')) {
     event.respondWith(
-      caches.open(TILE_CACHE).then(cache =>
-        cache.match(event.request).then(cached =>
-          cached || fetch(event.request).then(resp => {
-            if (resp.ok) {
-              cache.put(event.request, resp.clone());
-              trimCache(TILE_CACHE, MAX_TILES);
-            }
-            return resp;
-          })
-        )
-      )
+      getFreshTile(event.request).catch(() => null).then(async cached => {
+        if (cached) return cached;
+
+        const response = await fetch(event.request);
+        if (response.ok || response.type === 'opaque') {
+          try {
+            await cacheTile(event.request, response.clone());
+          } catch {
+            // Cache storage is optional; return the downloaded tile on quota failure.
+          }
+        }
+        return response;
+      })
     );
     return;
   }
