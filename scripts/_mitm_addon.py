@@ -125,7 +125,9 @@ def response(flow: http.HTTPFlow) -> None:
 def _save() -> None:
     """Save captured data to JSON file."""
     CAPTURE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CAPTURE_FILE.write_text(json.dumps(captured, indent=2, ensure_ascii=False, default=str))
+    CAPTURE_FILE.write_text(
+        json.dumps(captured, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+    )
 
 
 def done() -> None:

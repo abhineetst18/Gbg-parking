@@ -941,7 +941,7 @@ def scan_parkster():
 
     # Save full details
     outfile = DATA_DIR / "parkster_gothenburg_zones.json"
-    outfile.write_text(json.dumps(detailed, indent=2, ensure_ascii=False))
+    outfile.write_text(json.dumps(detailed, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Saved to: {outfile}")
 
     # Create summary with extracted pricing
@@ -970,7 +970,7 @@ def scan_parkster():
         summary.append(entry)
 
     summary_file = DATA_DIR / "parkster_gothenburg_summary.json"
-    summary_file.write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+    summary_file.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Summary saved to: {summary_file}")
 
 

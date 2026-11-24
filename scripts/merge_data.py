@@ -263,17 +263,17 @@ def load_easypark(gbg_codes: set[str] | None = None) -> list[dict]:
     if gbg_codes is None:
         gbg_codes = set()
 
-    raw = json.loads(path.read_text())
+    raw = json.loads(path.read_text(encoding="utf-8"))
 
     # Load API-fetched tariff prices as supplementary source
     tariff_prices = {}
     tariff_path = DATA_DIR / "easypark_prices.json"
     if tariff_path.exists():
-        tariff_prices = json.loads(tariff_path.read_text())
+        tariff_prices = json.loads(tariff_path.read_text(encoding="utf-8"))
     # Load lot-specific tariff prices (fetched via internal IDs)
     lot_tariff_path = DATA_DIR / "easypark_lot_prices.json"
     if lot_tariff_path.exists():
-        lot_prices = json.loads(lot_tariff_path.read_text())
+        lot_prices = json.loads(lot_tariff_path.read_text(encoding="utf-8"))
         # Merge: lot prices fill in gaps not covered by tile-based tariffs
         for k, v in lot_prices.items():
             if k not in tariff_prices:
@@ -364,12 +364,12 @@ def load_parkster() -> list[dict]:
         print("  WARNING: parkster_gothenburg_zones.json not found")
         return []
 
-    zones = json.loads(path.read_text())
+    zones = json.loads(path.read_text(encoding="utf-8"))
     # Also load summary for coordinates
     summary_path = DATA_DIR / "parkster_gothenburg_summary.json"
     coord_map = {}
     if summary_path.exists():
-        for s in json.loads(summary_path.read_text()):
+        for s in json.loads(summary_path.read_text(encoding="utf-8")):
             if s.get("lat") and s.get("lon"):
                 coord_map[s["id"]] = (s["lat"], s["lon"])
 
@@ -474,7 +474,7 @@ def load_parkering_gbg() -> list[dict]:
         print("  WARNING: gothenburg_parking_complete.json not found")
         return []
 
-    areas = json.loads(path.read_text())
+    areas = json.loads(path.read_text(encoding="utf-8"))
     results = []
     for a in areas:
         lat_raw = a.get("lat")
@@ -580,7 +580,7 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
         print("  WARNING: epark_gothenburg_zones.json not found")
         return []
 
-    zones = json.loads(path.read_text())
+    zones = json.loads(path.read_text(encoding="utf-8"))
     if not zones:
         print("  WARNING: epark_gothenburg_zones.json is empty")
         return []
@@ -609,7 +609,7 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
     # Geocode cache for ePARK-exclusive zones (persistent file cache)
     cache_path = DATA_DIR / "epark_geocode_cache.json"
     if cache_path.exists():
-        geocode_cache = json.loads(cache_path.read_text())
+        geocode_cache = json.loads(cache_path.read_text(encoding="utf-8"))
         # Convert stored lists back to tuples, keep None as None
         geocode_cache = {k: tuple(v) if v else None for k, v in geocode_cache.items()}
     else:
@@ -676,7 +676,7 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
                     cache_path.write_text(json.dumps(
                         {k: list(v) if v else None for k, v in geocode_cache.items()},
                         indent=1,
-                    ))
+                    ), encoding="utf-8")
                     cache_dirty = False
                     print(f"  ... geocoded {geocoded_count} so far (cache saved)")
                 time.sleep(1.1)  # Nominatim rate limit: 1 req/sec
@@ -730,7 +730,7 @@ def load_epark(gbg_spots: list[dict] | None = None) -> list[dict]:
         cache_path.write_text(json.dumps(
             {k: list(v) if v else None for k, v in geocode_cache.items()},
             indent=1,
-        ))
+        ), encoding="utf-8")
         print(f"  Saved geocode cache ({len(geocode_cache)} entries)")
 
     if geocoded_count:
@@ -1092,13 +1092,13 @@ def main():
 
     # Save to repo root (served by GitHub Pages)
     out_path = ROOT_DIR / "parking_data.json"
-    out_path.write_text(json.dumps(dataset, ensure_ascii=False))
+    out_path.write_text(json.dumps(dataset, ensure_ascii=False), encoding="utf-8")
     size_mb = out_path.stat().st_size / (1024 * 1024)
     print(f"\nSaved to {out_path} ({size_mb:.1f} MB)")
 
     # Also save a copy in data/
     data_copy = DATA_DIR / "parking_merged.json"
-    data_copy.write_text(json.dumps(dataset, ensure_ascii=False))
+    data_copy.write_text(json.dumps(dataset, ensure_ascii=False), encoding="utf-8")
     print(f"Saved copy to {data_copy}")
 
 

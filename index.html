@@ -427,12 +427,15 @@ body {
 .radius-btn:active { transform: scale(0.9); }
 [data-theme="light"] .radius-btn { border-color: rgba(0,0,0,0.1); }
 
-/* Result count */
+/* Snapshot status and result count */
+#snapshot-status,
 #result-count {
   padding: 0 12px 4px;
   font-size: 11px;
   color: var(--text-dim);
   flex-shrink: 0;
+}
+#result-count {
   display: none;
 }
 #result-count.visible { display: block; }
@@ -531,7 +534,7 @@ body {
 </head>
 <body>
 
-<div id="loading">
+<div id="loading" role="status">
   <div class="spinner"></div>
   <div>Loading parking data...</div>
 </div>
@@ -596,6 +599,7 @@ body {
     <span id="radius-label">3.0 km</span>
     <button class="radius-btn" onclick="adjustRadius(1)" aria-label="Increase radius">+</button>
   </div>
+  <div id="snapshot-status" role="status"></div>
   <div id="result-count"></div>
   <div id="results"></div>
 </div>
@@ -1030,18 +1034,56 @@ function escHtml(s) {
 }
 
 // ── Load data ──
+const SNAPSHOT_MAX_AGE_MS = 60 * 24 * 60 * 60 * 1000;
+
 async function loadData() {
+  const loading = document.getElementById('loading');
+  let data;
   try {
     const resp = await fetch('parking_data.json');
-    const data = await resp.json();
-    allSpots = data.spots || [];
-
-    refreshMap();
-    document.getElementById('loading').classList.add('hidden');
-  } catch (e) {
-    document.getElementById('loading').innerHTML =
-      `<div style="color:var(--accent)">Failed to load data</div><div style="font-size:12px;color:var(--text-dim)">${e.message}</div>`;
+    if (!resp.ok) throw new Error('Unsuccessful snapshot response');
+    try {
+      data = await resp.json();
+    } catch (e) {
+      if (!(e instanceof SyntaxError)) throw e;
+      loading.textContent = 'Parking data snapshot is invalid. Reload to try again.';
+      return;
+    }
+  } catch {
+    loading.textContent = 'Could not load the parking data snapshot. Reload to try again.';
+    return;
   }
+
+  const timestamp = data?.generated;
+  const isoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+  const generated = typeof timestamp === 'string' && isoTimestamp.test(timestamp)
+    ? Date.parse(timestamp) : NaN;
+  if (!Number.isFinite(generated) || !Array.isArray(data.spots) || data.spots.length === 0 ||
+      data.spots.some(spot => !spot || typeof spot.id !== 'string' ||
+        typeof spot.name !== 'string' || typeof spot.type !== 'string' ||
+        !Array.isArray(spot.sources) || !Number.isFinite(spot.lat) || !Number.isFinite(spot.lon) ||
+        (spot.price_sek_hr != null && !Number.isFinite(spot.price_sek_hr)) ||
+        (spot.price_text != null && typeof spot.price_text !== 'string') ||
+        (spot.season_start != null && typeof spot.season_start !== 'string') ||
+        (spot.season_end != null && typeof spot.season_end !== 'string'))) {
+    loading.textContent = 'Parking data snapshot is invalid. Reload to try again.';
+    return;
+  }
+
+  allSpots = data.spots;
+  try {
+    refreshMap();
+  } catch {
+    allSpots = [];
+    loading.textContent = 'Could not display the parking data snapshot. Reload to try again.';
+    return;
+  }
+  const date = new Date(generated).toISOString().slice(0, 10);
+  const warning = Date.now() - generated >= SNAPSHOT_MAX_AGE_MS
+    ? ' — Data is 60 days old or more. Check current tariffs before parking.'
+    : '';
+  document.getElementById('snapshot-status').textContent = `Parking data generated ${date} (UTC)${warning}`;
+  loading.classList.add('hidden');
 }
 
 // ── Refresh map + list ──

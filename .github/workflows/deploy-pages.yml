@@ -10,7 +10,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Run parking tests
+        env:
+          PYTHONUTF8: ${{ runner.os == 'Windows' && '0' || '' }}
+        run: python -B -m unittest discover -s tests -p "test_*.py"
+
   build:
+    needs: test
     permissions:
       contents: read
       pages: read

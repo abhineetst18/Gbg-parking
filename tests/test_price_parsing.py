@@ -286,8 +286,8 @@ class TestGeneratedPriceConsistency(unittest.TestCase):
             data_dir.mkdir()
             output = root / "parking_data.json"
             data_copy = data_dir / "parking_merged.json"
-            output.write_text("public-sentinel")
-            data_copy.write_text("data-sentinel")
+            output.write_text("public-sentinel", encoding="utf-8")
+            data_copy.write_text("data-sentinel", encoding="utf-8")
 
             with (
                 patch.object(merge_data, "ROOT_DIR", root),
@@ -302,8 +302,8 @@ class TestGeneratedPriceConsistency(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "Refusing to publish"):
                         merge_data.main()
 
-            self.assertEqual(output.read_text(), "public-sentinel")
-            self.assertEqual(data_copy.read_text(), "data-sentinel")
+            self.assertEqual(output.read_text(encoding="utf-8"), "public-sentinel")
+            self.assertEqual(data_copy.read_text(encoding="utf-8"), "data-sentinel")
 
 
 class TestPublishedEasyParkData(unittest.TestCase):
@@ -312,7 +312,7 @@ class TestPublishedEasyParkData(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         path = Path(__file__).resolve().parent.parent / "parking_data.json"
-        cls.spots = json.loads(path.read_text())["spots"]
+        cls.spots = json.loads(path.read_text(encoding="utf-8"))["spots"]
         cls.easypark_spots = [
             spot for spot in cls.spots if "easypark" in spot.get("sources", [])
         ]

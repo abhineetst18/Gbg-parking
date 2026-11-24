@@ -125,7 +125,7 @@ def analyze_captures(file_path: str | None = None) -> None:
     all_requests: list[dict] = []
     for f in files:
         try:
-            data = json.loads(f.read_text())
+            data = json.loads(f.read_text(encoding="utf-8"))
             all_requests.extend(data)
         except (json.JSONDecodeError, KeyError):
             print(f"Warning: Could not parse {f}")
@@ -217,7 +217,7 @@ def analyze_captures(file_path: str | None = None) -> None:
                     "query": r.get("query"),
                     "response_body_preview": r.get("response_body_preview"),
                 })
-        summary_file.write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+        summary_file.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"\nAPI summary saved to: {summary_file}")
     else:
         print("\n⚠ No EasyPark-specific hosts found in capture.")

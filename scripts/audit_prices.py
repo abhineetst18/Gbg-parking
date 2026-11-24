@@ -77,7 +77,7 @@ def extract_easypark() -> list[tuple[str, str]]:
     path = DATA_DIR / "easypark_gothenburg_complete.json"
     if not path.exists():
         return []
-    raw = json.loads(path.read_text())
+    raw = json.loads(path.read_text(encoding="utf-8"))
     out = []
     for ano, rec in raw.items():
         d = rec.get("areaDetail", {})
@@ -101,7 +101,7 @@ def extract_pgbg() -> list[tuple[str, str, float | None]]:
     path = DATA_DIR / "gothenburg_parking_complete.json"
     if not path.exists():
         return []
-    rows = json.loads(path.read_text())
+    rows = json.loads(path.read_text(encoding="utf-8"))
     out = []
     for x in rows if isinstance(rows, list) else []:
         name = x.get("name") or x.get("parking_code") or "?"
@@ -122,7 +122,7 @@ def extract_epark() -> list[tuple[str, str]]:
     path = DATA_DIR / "epark_gothenburg_zones.json"
     if not path.exists():
         return []
-    zones = json.loads(path.read_text())
+    zones = json.loads(path.read_text(encoding="utf-8"))
     out = []
     for z in zones if isinstance(zones, list) else []:
         name = z.get("title") or z.get("public_area_code", "?")
@@ -143,7 +143,7 @@ def extract_generated_easypark() -> list[dict]:
     path = ROOT_DIR / "parking_data.json"
     if not path.exists():
         return []
-    dataset = json.loads(path.read_text())
+    dataset = json.loads(path.read_text(encoding="utf-8"))
     return [
         spot
         for spot in dataset.get("spots", [])

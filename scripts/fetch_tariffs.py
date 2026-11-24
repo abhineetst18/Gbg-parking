@@ -30,7 +30,7 @@ def fetch_easypark_tariff(area_id: int, token: str) -> dict | None:
         ["curl", "-s", f"{EASYPARK_BASE}/ios/api/parkingarea/{area_id}/tariff",
          "-H", f"x-authorization: Bearer {token}",
          *EASYPARK_HEADERS],
-        capture_output=True, text=True, timeout=15,
+        capture_output=True, encoding="utf-8", timeout=15,
     )
     try:
         data = json.loads(result.stdout)
@@ -51,7 +51,7 @@ def fetch_parkster_nearby(lat: float, lon: float) -> list[dict]:
         ["curl", "-s", url,
          "-H", f"authorization: {PARKSTER_AUTH}",
          "-H", "accept: application/json"],
-        capture_output=True, text=True, timeout=15,
+        capture_output=True, encoding="utf-8", timeout=15,
     )
     try:
         data = json.loads(result.stdout)
@@ -71,7 +71,7 @@ def fetch_parkster_zone_detail(zone_id: int) -> dict | None:
         ["curl", "-s", url,
          "-H", f"authorization: {PARKSTER_AUTH}",
          "-H", "accept: application/json"],
-        capture_output=True, text=True, timeout=15,
+        capture_output=True, encoding="utf-8", timeout=15,
     )
     try:
         return json.loads(result.stdout)
@@ -88,8 +88,8 @@ def batch_easypark_tariffs():
         print("ERROR: No EasyPark token found at /tmp/easypark_token.txt")
         return
 
-    token = token_file.read_text().strip()
-    areas = json.loads(areas_file.read_text())
+    token = token_file.read_text(encoding="utf-8").strip()
+    areas = json.loads(areas_file.read_text(encoding="utf-8"))
     area_ids = [a["id"] for a in areas]
     print(f"Fetching tariffs for {len(area_ids)} EasyPark areas...")
 
@@ -110,7 +110,7 @@ def batch_easypark_tariffs():
 
     # Save tariffs
     outfile = DATA_DIR / "easypark_tariffs.json"
-    outfile.write_text(json.dumps(tariffs, indent=2, ensure_ascii=False))
+    outfile.write_text(json.dumps(tariffs, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Saved to: {outfile}")
 
     # Merge tariffs into areas
@@ -120,7 +120,7 @@ def batch_easypark_tariffs():
             area["tariff"] = tariffs[aid]
 
     merged_file = DATA_DIR / "easypark_gothenburg_complete.json"
-    merged_file.write_text(json.dumps(areas, indent=2, ensure_ascii=False))
+    merged_file.write_text(json.dumps(areas, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Merged data saved to: {merged_file}")
 
     return tariffs
@@ -168,7 +168,7 @@ def scan_parkster_gothenburg():
     # Save
     zones_list = list(detailed.values())
     outfile = DATA_DIR / "parkster_gothenburg_zones.json"
-    outfile.write_text(json.dumps(zones_list, indent=2, ensure_ascii=False))
+    outfile.write_text(json.dumps(zones_list, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Saved to: {outfile}")
 
     return zones_list

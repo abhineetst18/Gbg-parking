@@ -1,4 +1,4 @@
-const CACHE_NAME = 'parking-gbg-v38';
+const CACHE_NAME = 'parking-gbg-v39';
 const TILE_CACHE = 'parking-gbg-tiles-v2';
 const TILE_METADATA_CACHE = 'parking-gbg-tile-metadata-v1';
 const MAX_TILES = 500;

@@ -79,13 +79,14 @@
 ### Web App
 - `index.html` — PWA frontend
   - **Reads:** `parking_data.json` (fetched via service worker)
+  - **Snapshot status:** displays the `generated` date in UTC, warns at 60 days, and reports unavailable or invalid snapshots instead of showing an empty result set
   - **Displays:** Map markers with name, price_sek_hr, price_text, area_code
   - **Search/filter:** By price, type, proximity
   - **Responsive panel:** below 768px, controls and results remain a collapsible bottom panel; at 768px and above, they become a fixed 360px right sidebar while the map fills the remaining width
 
 - `sw.js` — Service worker
-  - **Cache strategy:** Network-first for `parking_data.json` (cache name: `parking-gbg-v38`); CARTO/Esri tiles use a 500-entry browser cache with per-entry metadata and a 30-day maximum age
-  - **Cache invalidation trigger:** Bump `CACHE_NAME` version when data changes
+  - **Cache strategy:** Network-first for `parking_data.json` (cache name: `parking-gbg-v39`); CARTO/Esri tiles use a 500-entry browser cache with per-entry metadata and a 30-day maximum age
+  - **Cache invalidation trigger:** Bump `CACHE_NAME` version when the snapshot or cached app assets change
   - **Dependencies:** Production deployment requires coordinated sw.js version bump + data refresh
 
 - `config.js` — Secret-free local runtime configuration
@@ -105,7 +106,7 @@
 - No API keys or secrets committed to repo
 
 ### Current Data Staleness
-- Production `parking_data.json` is based on the 2026-06-16 snapshot with the bounded 2026-08-31 four-row correction above; `sw.js` is at `parking-gbg-v38`
+- Production `parking_data.json` is based on the 2026-06-16 snapshot with the bounded 2026-08-31 four-row correction above; checkout `sw.js` is at `parking-gbg-v39`
 - **No full merge/regeneration is allowed yet:** the current canonical EasyPark file contains only 301 live records versus 1,893 EasyPark source records in the historical published snapshot. Wait until a sufficiently complete refresh passes the ≥99% resolved-coverage promotion gate
 - The in-flight EasyPark refresh is a checkpoint-v1 state with live results plus raw query-form 404 failures that have not yet been probed against the internal-id endpoint; those stay unresolved until a probe runs
 - EasyPark tariffs change periodically; refresh is manual and quota-bound, never automated
@@ -127,6 +128,7 @@
 - No automated correction mechanism; verified via Google Street View
 
 ## Verification & Testing
+- **Deploy gate:** Pages build requires the parking tests to pass on Linux and on Windows with `PYTHONUTF8=0`.
 - **Automated tests:** standard-library `unittest`, no pytest dependency. Run from the project root with `python3 -m unittest discover -s tests -p 'test_*.py'`
   - `tests/test_price_parsing.py` — locks interval parsing, mixed free+paid handling, rate-bearing line selection, free-period/time-limit disambiguation, tariff-source provenance, public-output consistency, and seasonal ranges in `merge_data`
   - `tests/test_fetch_easypark.py` — offline coverage of the resumable EasyPark fetch (fake transport, injected sleep; makes no network request): stop-on-429, resume, incomplete drain, ≥99% promotion, 401/403 stop, retry/backoff, priority ordering, live-anchor round trip through the merge parser, secret scrubbing, tariff opt-in, resume-state refusal, truthful exit codes, and the internal-id 404 fallback (live promotion via `source: "internal_id"`, tombstoning, areaNo-mismatch rejection, fallback auth/rate-limit/transient handling, additive v1 migration, fail-closed state invariants, resolved-coverage promotion and coverage-report field safety)
